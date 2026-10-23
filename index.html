@@ -1,0 +1,1857 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LED Display Explainer</title></head><body><script type="module">
+const AZIMUTH = 45;
+const ELEVATION = 30;
+const SHADES = 4;
+const RADIANS = Math.PI / 180;
+const UNIT = Math.sqrt(1.6);
+function cameraOf({ scale, azimuth = AZIMUTH, elevation = ELEVATION }) {
+    const a = azimuth * RADIANS;
+    const e = elevation * RADIANS;
+    return { sinA: Math.sin(a), cosA: Math.cos(a), sinE: Math.sin(e), cosE: Math.cos(e), k: scale * UNIT };
+}
+function iso([x, y, z], projection) {
+    const { origin } = projection;
+    const { sinA, cosA, sinE, cosE, k } = cameraOf(projection);
+    return [origin[0] + (x * sinA - y * cosA) * k, origin[1] + ((x * cosA + y * sinA) * sinE - z * cosE) * k];
+}
+function towardViewer(projection) {
+    const { sinA, cosA } = cameraOf(projection);
+    return [cosA, sinA];
+}
+function depthOf([x, y, z], projection) {
+    const { sinA, cosA, sinE, cosE } = cameraOf(projection);
+    return (x * cosA + y * sinA) * cosE + z * sinE;
+}
+const tenth = (value) => {
+    const text = (Math.round(value * 10) / 10).toFixed(1).replace(/\.0$/, "");
+    return text === "-0" ? "0" : text;
+};
+function pathOf(points, closed = false) {
+    if (!points.length)
+        return "";
+    return points.map(([x, y], at) => `${at ? "L" : "M"}${tenth(x)} ${tenth(y)}`).join("") + (closed ? "Z" : "");
+}
+const joinPaths = (paths) => paths.filter(Boolean).join("");
+function roundedPlan({ x, y, w, d, r }, steps = 8) {
+    const radius = Math.max(0, Math.min(r, w / 2, d / 2));
+    const corners = [
+        [x + w - radius, y + radius, -90],
+        [x + w - radius, y + d - radius, 0],
+        [x + radius, y + d - radius, 90],
+        [x + radius, y + radius, 180],
+    ];
+    const out = [];
+    for (const [cx, cy, start] of corners) {
+        const count = radius > 0 ? steps : 0;
+        for (let step = 0; step <= count; step++) {
+            const angle = (start + (count ? (90 * step) / count : 45)) * RADIANS;
+            out.push([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)]);
+        }
+    }
+    return out;
+}
+function signedArea(points) {
+    let area = 0;
+    for (let index = 0; index < points.length; index++) {
+        const [ax, ay] = points[index];
+        const [bx, by] = points[(index + 1) % points.length];
+        area += ax * by - bx * ay;
+    }
+    return area / 2;
+}
+const oriented = (points) => (signedArea(points) < 0 ? [...points].reverse() : points);
+function convexHull(points) {
+    const sorted = [...points].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    if (sorted.length < 3)
+        return sorted;
+    const cross = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lower = [];
+    for (const point of sorted) {
+        while (lower.length >= 2 && cross(lower[lower.length - 2], lower[lower.length - 1], point) <= 0)
+            lower.pop();
+        lower.push(point);
+    }
+    const upper = [];
+    for (let index = sorted.length - 1; index >= 0; index--) {
+        const point = sorted[index];
+        while (upper.length >= 2 && cross(upper[upper.length - 2], upper[upper.length - 1], point) <= 0)
+            upper.pop();
+        upper.push(point);
+    }
+    return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+function runsOf(flags, want) {
+    const count = flags.length;
+    const runs = [];
+    const start = flags.findIndex((flag, index) => flag !== flags[(index + count - 1) % count]);
+    if (start < 0)
+        return flags[0] === want ? [Array.from({ length: count + 1 }, (_, index) => index % count)] : [];
+    let run = null;
+    for (let step = 0; step < count; step++) {
+        const index = (start + step) % count;
+        if (flags[index] === want) {
+            if (!run)
+                run = [index];
+            run.push((index + 1) % count);
+        }
+        else if (run) {
+            runs.push(run);
+            run = null;
+        }
+    }
+    if (run)
+        runs.push(run);
+    return runs;
+}
+function extrude(ring, z, height, projection, options = {}) {
+    const convex = options.convex ?? true;
+    const count = ring.length;
+    const counter = signedArea(ring) > 0;
+    const [vx, vy] = towardViewer(projection);
+    const { sinA, cosA } = cameraOf(projection);
+    const normals = ring.map(([ax, ay], index) => {
+        const [bx, by] = ring[(index + 1) % count];
+        const dx = bx - ax;
+        const dy = by - ay;
+        const length = Math.hypot(dx, dy) || 1;
+        return (counter ? [dy / length, -dx / length] : [-dy / length, dx / length]);
+    });
+    const facing = normals.map(([nx, ny]) => nx * vx + ny * vy > 1e-9);
+    const top = ring.map(([x, y]) => iso([x, y, z + height], projection));
+    const bottom = ring.map(([x, y]) => iso([x, y, z], projection));
+    const outline = [];
+    const crease = [];
+    for (const run of runsOf(facing, false))
+        outline.push(pathOf(run.map((index) => top[index])));
+    for (const run of runsOf(facing, true)) {
+        crease.push(pathOf(run.map((index) => top[index])));
+        if (height > 0)
+            outline.push(pathOf(run.map((index) => bottom[index])));
+    }
+    if (height > 0) {
+        for (let index = 0; index < count; index++) {
+            if (facing[(index + count - 1) % count] !== facing[index])
+                outline.push(pathOf([top[index], bottom[index]]));
+        }
+    }
+    let fill;
+    if (convex) {
+        fill = pathOf(convexHull([...top, ...bottom]), true);
+    }
+    else {
+        const parts = [pathOf(oriented(top), true), pathOf(oriented(bottom), true)];
+        for (let index = 0; index < count; index++) {
+            if (!facing[index])
+                continue;
+            const next = (index + 1) % count;
+            parts.push(pathOf(oriented([top[index], top[next], bottom[next], bottom[index]]), true));
+        }
+        fill = parts.join("");
+    }
+    const buckets = Array.from({ length: SHADES }, () => []);
+    if (height > 0) {
+        const [lx, ly] = [-sinA, cosA];
+        for (let index = 0; index < count; index++) {
+            if (!facing[index])
+                continue;
+            const [nx, ny] = normals[index];
+            const lit = (nx * lx + ny * ly + 1) / 2;
+            const shade = Math.min(SHADES - 1, Math.max(0, Math.floor(lit * SHADES)));
+            const next = (index + 1) % count;
+            buckets[shade].push(pathOf(oriented([top[index], top[next], bottom[next], bottom[index]]), true));
+        }
+    }
+    let bevel;
+    if (options.bevel && options.bevel > 0) {
+        const by = options.bevel;
+        const inset = ring.map(([x, y], index) => {
+            const [ax, ay] = normals[(index + count - 1) % count];
+            const [bx, by2] = normals[index];
+            const mx = ax + bx;
+            const my = ay + by2;
+            const length = Math.hypot(mx, my) || 1;
+            return [x - (mx / length) * by, y - (my / length) * by];
+        });
+        const insetTop = inset.map(([x, y]) => iso([x, y, z + height], projection));
+        bevel = runsOf(facing, true)
+            .map((run) => pathOf([top[run[0]], ...run.slice(1, -1).map((index) => insetTop[index]), top[run[run.length - 1]]]))
+            .join("");
+    }
+    return {
+        fill,
+        outline: outline.join(""),
+        crease: crease.join(""),
+        top: pathOf(oriented(top), true),
+        shades: buckets.map((paths) => paths.join("")),
+        bevel,
+    };
+}
+const ringOf = (plan, steps = 8) => roundedPlan(plan, steps);
+function slabOf(plan, z, height, projection, steps = 8, bevel = 0) {
+    return extrude(ringOf(plan, steps), z, height, projection, { convex: true, bevel });
+}
+function circleRing(cx, cy, radius, steps = 40) {
+    return Array.from({ length: steps }, (_, step) => {
+        const angle = (step / steps) * Math.PI * 2;
+        return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+    });
+}
+function cylinder(cx, cy, radius, z, height, projection, steps = 32, bevel = 0) {
+    return extrude(circleRing(cx, cy, radius, steps), z, height, projection, { convex: true, bevel });
+}
+const insetPlan = ({ x, y, w, d, r }, by) => ({ x: x + by, y: y + by, w: w - by * 2, d: d - by * 2, r: Math.max(0, r - by) });
+function onTop(points, z, projection, closed = false) {
+    return pathOf(points.map(([x, y]) => iso([x, y, z], projection)), closed);
+}
+const planOutline = (plan, z, projection, steps = 8) => onTop(ringOf(plan, steps), z, projection, true);
+const lineOnTop = (from, to, z, projection) => onTop([from, to], z, projection);
+const segment = (from, to, projection) => pathOf([iso(from, projection), iso(to, projection)]);
+const rise = (at, from, to, projection) => segment([at[0], at[1], from], [at[0], at[1], to], projection);
+const ring = (cx, cy, radius, z, projection, steps = 40) => onTop(circleRing(cx, cy, radius, steps), z, projection, true);
+const pointsAt = (points, projection) => points.map((point) => iso(point, projection));
+function dotGrid(x, y, columns, rows, gap, z, projection) {
+    const dots = [];
+    for (let row = 0; row < rows; row++) {
+        for (let column = 0; column < columns; column++)
+            dots.push(iso([x + column * gap, y + row * gap, z], projection));
+    }
+    return dots;
+}
+function corners({ x, y, w, d }, inset = 0) {
+    return [
+        [x + inset, y + inset],
+        [x + w - inset, y + inset],
+        [x + inset, y + d - inset],
+        [x + w - inset, y + d - inset],
+    ];
+}
+function boxCorners({ x, y, w, d }, z0, z1) {
+    const out = [];
+    for (const px of [x, x + w])
+        for (const py of [y, y + d])
+            for (const z of [z0, z1])
+                out.push([px, py, z]);
+    return out;
+}
+function knurl(cx, cy, radius, z0, z1, count, projection, inset = 0.4) {
+    const [vx, vy] = towardViewer(projection);
+    const lines = [];
+    for (let index = 0; index < count; index++) {
+        const angle = (index / count) * Math.PI * 2;
+        const nx = Math.cos(angle);
+        const ny = Math.sin(angle);
+        if (nx * vx + ny * vy < 0.15)
+            continue;
+        lines.push(segment([cx + radius * nx, cy + radius * ny, z0 + inset], [cx + radius * nx, cy + radius * ny, z1 - inset], projection));
+    }
+    return lines.join("");
+}
+function sideArc(cx, cy, radius, z, projection, steps = 24) {
+    const [vx, vy] = towardViewer(projection);
+    const facing = Math.atan2(vy, vx);
+    const points = [];
+    for (let step = 0; step <= steps; step++) {
+        const angle = facing - Math.PI / 2 + (step / steps) * Math.PI;
+        points.push(iso([cx + radius * Math.cos(angle), cy + radius * Math.sin(angle), z], projection));
+    }
+    return pathOf(points);
+}
+function ringSeam(ring, z, projection) {
+    const count = ring.length;
+    const counter = signedArea(ring) > 0;
+    const [vx, vy] = towardViewer(projection);
+    const facing = ring.map(([ax, ay], index) => {
+        const [bx, by] = ring[(index + 1) % count];
+        const dx = bx - ax;
+        const dy = by - ay;
+        const [nx, ny] = counter ? [dy, -dx] : [-dy, dx];
+        return nx * vx + ny * vy > 1e-9;
+    });
+    return runsOf(facing, true).map((run) => pathOf(run.map((index) => iso([ring[index][0], ring[index][1], z], projection)))).join("");
+}
+const sideSeam = (plan, z, projection, steps = 8) => ringSeam(ringOf(plan, steps), z, projection);
+function sideRing(center, radius, axis, projection, steps = 20) {
+    const [px, py, pz] = center;
+    const points = [];
+    for (let step = 0; step < steps; step++) {
+        const angle = (step / steps) * Math.PI * 2;
+        const u = radius * Math.cos(angle);
+        const v = radius * Math.sin(angle);
+        points.push(iso(axis === "x" ? [px, py + u, pz + v] : [px + u, py, pz + v], projection));
+    }
+    return pathOf(points, true);
+}
+function coil(from, to, center, radius, turns, axis, projection, perTurn = 16) {
+    const count = Math.max(1, Math.round(turns * perTurn));
+    const back = [];
+    const front = [];
+    let run = [];
+    let near = null;
+    for (let index = 0; index <= count; index++) {
+        const share = index / count;
+        const angle = share * turns * Math.PI * 2;
+        const u = radius * Math.cos(angle);
+        const v = radius * Math.sin(angle);
+        const along = from + (to - from) * share;
+        const point = axis === "x" ? [along, center[0] + u, center[1] + v] : [center[0] + u, along, center[1] + v];
+        const normal = axis === "x" ? [0, Math.cos(angle), Math.sin(angle)] : [Math.cos(angle), 0, Math.sin(angle)];
+        const facing = depthOf(normal, projection) > 0;
+        const flat = iso(point, projection);
+        if (near === null)
+            near = facing;
+        if (facing !== near) {
+            run.push(flat);
+            (near ? front : back).push(pathOf(run));
+            run = [flat];
+            near = facing;
+            continue;
+        }
+        run.push(flat);
+    }
+    if (run.length > 1)
+        (near ? front : back).push(pathOf(run));
+    return { back: back.join(""), front: front.join("") };
+}
+function topTicks(from, to, step, every, edge, z, lengths, projection, axis = "x") {
+    const minor = [];
+    const major = [];
+    const first = Math.ceil(from / step) * step;
+    for (let at = first, index = Math.round(first / step); at <= to + 1e-9; at += step, index++) {
+        const big = index % every === 0;
+        const length = big ? lengths[1] : lengths[0];
+        const a = axis === "x" ? [at, edge] : [edge, at];
+        const b = axis === "x" ? [at, edge + length] : [edge + length, at];
+        (big ? major : minor).push(lineOnTop(a, b, z, projection));
+    }
+    return { minor: minor.join(""), major: major.join("") };
+}
+function sideTicks(from, to, step, every, face, top, lengths, projection, axis = "x") {
+    const minor = [];
+    const major = [];
+    const first = Math.ceil(from / step) * step;
+    for (let at = first, index = Math.round(first / step); at <= to + 1e-9; at += step, index++) {
+        const big = index % every === 0;
+        const length = big ? lengths[1] : lengths[0];
+        const a = axis === "x" ? [at, face, top] : [face, at, top];
+        const b = axis === "x" ? [at, face, top - length] : [face, at, top - length];
+        (big ? major : minor).push(segment(a, b, projection));
+    }
+    return { minor: minor.join(""), major: major.join("") };
+}
+function radialTicks(cx, cy, radius, count, every, z, lengths, projection, from = 0, span = Math.PI * 2) {
+    const minor = [];
+    const major = [];
+    const closed = Math.abs(span - Math.PI * 2) < 1e-9;
+    const steps = closed ? count : count + 1;
+    for (let index = 0; index < steps; index++) {
+        const angle = from + (index / count) * span;
+        const big = index % every === 0;
+        const inner = radius - (big ? lengths[1] : lengths[0]);
+        const sx = Math.sin(angle);
+        const sy = -Math.cos(angle);
+        (big ? major : minor).push(lineOnTop([cx + sx * inner, cy + sy * inner], [cx + sx * radius, cy + sy * radius], z, projection));
+    }
+    return { minor: minor.join(""), major: major.join("") };
+}
+const haloOf = (plan, z, height, projection) => slabOf(plan, z, height, projection).fill;
+function axisVector(projection, [dx, dy, dz]) {
+    const origin = iso([0, 0, 0], projection);
+    const moved = iso([dx, dy, dz], projection);
+    return [moved[0] - origin[0], moved[1] - origin[1]];
+}
+const fine = (value) => Math.round(value * 100) / 100;
+function translateAlong(projection, by) {
+    const [x, y] = axisVector(projection, by);
+    return `translate(${fine(x)} ${fine(y)})`;
+}
+const thousandth = (value) => Math.round(value * 1000) / 1000;
+function axesAt(at, z, projection) {
+    const origin = iso([at[0], at[1], z], projection);
+    const along = (point) => {
+        const [px, py] = iso(point, projection);
+        return [px - origin[0], py - origin[1]];
+    };
+    return { origin, x: along([at[0] + 1, at[1], z]), y: along([at[0], at[1] + 1, z]), z: along([at[0], at[1], z + 1]) };
+}
+const matrixOf = (u, v, origin) => `matrix(${thousandth(u[0])} ${thousandth(u[1])} ${thousandth(v[0])} ${thousandth(v[1])} ${thousandth(origin[0])} ${thousandth(origin[1])})`;
+function holdStill(element, [dx, dy]) {
+    const text = dx || dy ? `translate(${-dx} ${-dy})` : "";
+    element.querySelectorAll("[data-hold]").forEach((node) => (text ? node.setAttribute("transform", text) : node.removeAttribute("transform")));
+}
+function topMatrix(at, z, projection, along = "x") {
+    const { origin, x, y } = axesAt(at, z, projection);
+    return along === "x" ? matrixOf(x, y, origin) : matrixOf([-y[0], -y[1]], x, origin);
+}
+function sideMatrix(at, z, projection, face) {
+    const { origin, x, y, z: up } = axesAt(at, z, projection);
+    const down = [-up[0], -up[1]];
+    return face === "left" ? matrixOf(x, down, origin) : matrixOf([-y[0], -y[1]], down, origin);
+}
+function screenRise(height, projection) {
+    const { cosE, k } = cameraOf(projection);
+    return height * cosE * k;
+}
+function fitProjection(points, width, height, { pad = 24, headroom = 0, azimuth = AZIMUTH, elevation = ELEVATION } = {}) {
+    const unit = { origin: [0, 0], scale: 1, azimuth, elevation };
+    const flat = points.map((point) => iso(point, unit));
+    const xs = flat.map(([x]) => x);
+    const ys = flat.map(([, y]) => y);
+    const left = Math.min(...xs);
+    const right = Math.max(...xs);
+    const up = Math.min(...ys);
+    const down = Math.max(...ys);
+    const scale = Math.min((width - pad * 2) / (right - left), (height - pad * 2 - headroom) / (down - up));
+    return {
+        origin: [width / 2 - ((left + right) / 2) * scale, headroom + (height - headroom) / 2 - ((up + down) / 2) * scale],
+        scale,
+        azimuth,
+        elevation,
+    };
+}
+const escape = (text) => text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+const attrs = (pairs) => Object.entries(pairs)
+    .filter(([, value]) => value !== undefined && value !== false)
+    .map(([key, value]) => ` ${key}="${escape(String(value))}"`)
+    .join("");
+function solidSvg(paths, { tone = "hi", crease = "faint", halo = false, lit = false, flat = false, className, inner = "" } = {}) {
+    const parts = [];
+    if (halo)
+        parts.push(`<path class="iso-halo" d="${paths.fill}"/>`);
+    parts.push(`<path class="iso-fill" d="${paths.fill}"/>`);
+    if (!flat) {
+        paths.shades.forEach((d, shade) => {
+            if (d)
+                parts.push(`<path class="iso-shade" data-shade="${shade}" d="${d}"/>`);
+        });
+        parts.push(`<path class="iso-top" d="${paths.top}"/>`);
+    }
+    if (crease !== "none" && paths.crease)
+        parts.push(`<path class="iso-line iso-crease" data-tone="${crease}" d="${paths.crease}"/>`);
+    if (crease !== "none" && paths.bevel)
+        parts.push(`<path class="iso-line iso-bevel" data-tone="${crease}" d="${paths.bevel}"/>`);
+    if (inner)
+        parts.push(inner);
+    parts.push(`<path class="iso-line iso-edge" data-tone="${tone}" d="${paths.outline}"/>`);
+    return `<g${attrs({ class: className ? `iso-solid ${className}` : "iso-solid", "data-lit": lit ? "" : undefined, "data-seamless": paths.seamless ? "" : undefined })}>${parts.join("")}</g>`;
+}
+function lineSvg(d, { tone = "lo", dotted = false, dashed = false, flow = false, className, free } = {}) {
+    if (!d)
+        return "";
+    return `<path${attrs({
+        class: className ? `iso-line ${className}` : "iso-line",
+        "data-tone": tone,
+        "data-free": free === true ? "" : free || undefined,
+        "data-dotted": dotted ? "" : undefined,
+        "data-dashed": dashed ? "" : undefined,
+        "data-flow": flow ? "" : undefined,
+        d,
+    })}/>`;
+}
+function dotsSvg(points, { size = 0.5, tone = "mid", pulse = false } = {}) {
+    const dots = points
+        .map(([x, y, alpha], index) => `<circle cx="${tenth(x)}" cy="${tenth(y)}" r="${size}"${alpha !== undefined && alpha < 1 ? ` fill-opacity="${Math.max(0, alpha).toFixed(2)}"` : ""}${pulse ? ` data-pulse="" style="--pulse-at:${(index * 137) % 1600}ms"` : ""}/>`)
+        .join("");
+    return `<g class="iso-dots" data-tone="${tone}">${dots}</g>`;
+}
+function fadedSvg(list, style = {}) {
+    const groups = new Map();
+    for (const entry of list) {
+        const [d, alpha] = Array.isArray(entry) ? entry : [entry.d, entry.alpha];
+        if (!d || !(alpha > 0.02))
+            continue;
+        const level = Math.min(1, Math.round(alpha * 20) / 20);
+        groups.set(level, (groups.get(level) ?? "") + d);
+    }
+    return [...groups].map(([alpha, d]) => (alpha >= 1 ? lineSvg(d, style) : `<g opacity="${alpha.toFixed(2)}">${lineSvg(d, style)}</g>`)).join("");
+}
+function fadeLineSvg(points, { fade = [0, 0], tone = "lo", className, stops = 6 } = {}) {
+    if (points.length < 2)
+        return "";
+    const ease = (t) => t * t * (3 - 2 * t);
+    const hashOf = (text) => {
+        let hash = 2166136261;
+        for (let index = 0; index < text.length; index++)
+            hash = Math.imul(hash ^ text.charCodeAt(index), 16777619);
+        return (hash >>> 0).toString(36);
+    };
+    const lengths = [0];
+    for (let index = 1; index < points.length; index++)
+        lengths.push(lengths[index - 1] + Math.hypot(points[index][0] - points[index - 1][0], points[index][1] - points[index - 1][1]));
+    const at = (length) => {
+        let index = 1;
+        while (index < points.length - 1 && lengths[index] < length)
+            index++;
+        const span = lengths[index] - lengths[index - 1] || 1;
+        const t = Math.max(0, Math.min(1, (length - lengths[index - 1]) / span));
+        return [points[index - 1][0] + (points[index][0] - points[index - 1][0]) * t, points[index - 1][1] + (points[index][1] - points[index - 1][1]) * t];
+    };
+    const pieceOf = (from, to) => [at(from), ...points.filter((_, index) => lengths[index] > from + 1e-6 && lengths[index] < to - 1e-6), at(to)];
+    const total = lengths[lengths.length - 1];
+    if (total < 1e-6)
+        return "";
+    let [start, end] = Array.isArray(fade) ? fade : [fade, fade];
+    if (start + end > total) {
+        const share = total / (start + end);
+        start *= share;
+        end *= share;
+    }
+    const paint = `var(--anatomy-${tone})`;
+    const ramp = (piece, rising) => {
+        const d = pathOf(piece);
+        const [x1, y1] = piece[0];
+        const [x2, y2] = piece[piece.length - 1];
+        const id = `iso-fade-${hashOf(`${d}|${tone}|${rising}`)}`;
+        const marks = Array.from({ length: stops + 1 }, (_, index) => {
+            const t = index / stops;
+            const alpha = ease(rising ? t : 1 - t);
+            return `<stop offset="${t.toFixed(3)}" stop-opacity="${alpha.toFixed(3)}" style="stop-color:${paint}"/>`;
+        }).join("");
+        const gradient = `<linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${tenth(x1)}" y1="${tenth(y1)}" x2="${tenth(x2)}" y2="${tenth(y2)}">${marks}</linearGradient>`;
+        return `<defs>${gradient}</defs><path${attrs({ class: className ? `iso-line ${className}` : "iso-line", "data-tone": tone, "data-free": rising ? "start" : "end", d, style: `stroke:url(#${id})` })}/>`;
+    };
+    const parts = [];
+    if (start > 0.05)
+        parts.push(ramp(pieceOf(0, start), true));
+    if (total - end - start > 0.05)
+        parts.push(lineSvg(pathOf(pieceOf(start, total - end)), { tone, className }));
+    if (end > 0.05)
+        parts.push(ramp(pieceOf(total - end, total), false));
+    return `<g class="iso-fade">${parts.join("")}</g>`;
+}
+function wireSvg(from, to, { via = [], tone = "lo", dotted = false, dashed = false, flow = false, ends = "both", size = 1.2 } = {}) {
+    const d = pathOf([from, ...via, to]);
+    const end = ([x, y]) => `<circle class="iso-wire-end" cx="${tenth(x)}" cy="${tenth(y)}" r="${size}"/>`;
+    return `<g class="iso-wire" data-tone="${tone}">${lineSvg(d, { tone, dotted, dashed, flow })}${ends === "both" || ends === "from" ? end(from) : ""}${ends === "both" || ends === "to" ? end(to) : ""}</g>`;
+}
+function faceTextSvg(transform, text, { size = 3, tone = "mid", anchor = "start" } = {}) {
+    return `<text class="iso-face-text" data-tone="${tone}" transform="${transform}" font-size="${size}" text-anchor="${anchor}">${escape(text)}</text>`;
+}
+function groupSvg(children, extra = {}) {
+    return `<g${attrs(extra)}>${Array.isArray(children) ? children.join("") : children}</g>`;
+}
+function figureSvg({ width, height, label, body, standalone = false, className }) {
+    const style = standalone ? `<style>${ISO_CSS}</style>` : "";
+    return `<svg${attrs({
+        xmlns: "http://www.w3.org/2000/svg",
+        class: `iso-svg${standalone ? " iso" : ""}${className ? ` ${className}` : ""}`,
+        "data-theme": standalone || undefined,
+        viewBox: `0 0 ${width} ${height}`,
+        role: "img",
+        "aria-label": label,
+    })}>${style}${Array.isArray(body) ? body.join("") : body}</svg>`;
+}
+function swatchSvg(mark) {
+    if (mark === "raised" || mark === "flat" || mark === "lit") {
+        const body = mark === "flat" ? "M2 6.5 8 3.5 14 6.5 8 9.5Z" : "M2 4.5 8 1.5 14 4.5 14 6 8 9 2 6Z";
+        const crease = mark === "flat" ? "" : `<path class="iso-swatch-crease" d="M2 4.5 8 7.5 14 4.5"/>`;
+        return `<svg class="iso-swatch" data-mark="${mark}" viewBox="0 0 16 10" aria-hidden="true"><path d="${body}"/>${crease}</svg>`;
+    }
+    return `<svg class="iso-swatch" data-mark="${mark}" viewBox="0 0 16 10" aria-hidden="true"><path d="M1.5 5h13"/></svg>`;
+}
+function plateHtml({ fig, title, hint, readout = "", keys = [], caption, body }) {
+    const corner = (name, text, extra = "") => `<span class="iso-plate-corner" data-corner="${name}"${extra}>${escape(text)}</span>`;
+    const legend = keys.length || caption
+        ? `<figcaption class="iso-legend">${keys.length ? `<span class="iso-keys">${keys.map((key) => `<span class="iso-key">${swatchSvg(key.mark)}${escape(key.label)}</span>`).join("")}</span>` : ""}${caption ? `<span class="iso-caption">${escape(caption)}</span>` : ""}</figcaption>`
+        : "";
+    return `<figure class="iso-figure"><div class="iso-plate"><div class="iso-plate-corners" aria-hidden="true">${corner("fig", fig)}${title ? corner("title", title) : ""}${hint ? corner("hint", hint) : ""}${corner("readout", readout, " data-readout")}</div>${body}</div>${legend}</figure>`;
+}
+function pageHtml({ title, theme = "dark", body, script = "", width = 650 }) {
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${escape(title)}</title><style>${ISO_CSS}${PAGE_CSS.replace("__WIDTH__", String(width))}</style></head><body class="iso" data-theme="${theme}"><main class="iso-page">${body}</main>${script ? `<script type="module">${script.replace(/<\/(script)/gi, "<\\/$1")}<\/script>` : ""}</body></html>`;
+}
+const PAGE_CSS = `
+*{box-sizing:border-box}
+html{color-scheme:dark}
+body[data-theme="light"]{color-scheme:light}
+body{margin:0;background:var(--anatomy-page);color:var(--anatomy-text);font:14px/1.6 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+.iso-page{width:min(__WIDTH__px,100% - 32px);margin:64px auto 96px}
+`;
+const ISO_CSS = `
+.iso{
+  --anatomy-page:#0b0b0b;--anatomy-card:#131313;--anatomy-text:#a3a3a3;--anatomy-strong:#e6e6e6;--anatomy-muted:#6e6e6e;
+  --anatomy-paper:#131313;--anatomy-face:#1b1b1b;--anatomy-top:#1c1c1c;
+  --anatomy-shade-0:#0f0f0f;--anatomy-shade-1:#121212;--anatomy-shade-2:#151515;--anatomy-shade-3:#181818;
+  --anatomy-lit-top:#262626;--anatomy-lit-shade:#1d1d1d;
+  --anatomy-hi:#d4d4d4;--anatomy-mid:#6a6a6a;--anatomy-lo:#3e3e3e;--anatomy-faint:#2a2a2a;--anatomy-lit:#ffffff;
+  --anatomy-halo:#050505;--anatomy-halo-opacity:.9;--anatomy-dot:#e6e6e6;
+  --anatomy-red:#ff6b6b;--anatomy-green:#6be0a0;--anatomy-blue:#6b9bff;
+  --anatomy-weight:.6px;--anatomy-ease:cubic-bezier(.32,.72,0,1);
+  --anatomy-mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --anatomy-lift:inset 0 1px 0 0 #ffffff0a,inset 0 0 0 1px #ffffff06,0 0 0 1px #00000026,0 1px 1px -.5px #00000014,0 3px 3px -1.5px #00000014,0 6px 6px -3px #00000014,0 12px 12px -6px #00000014;
+}
+.iso[data-theme="light"]{
+  --anatomy-page:#f2f2ef;--anatomy-card:#fbfbfa;--anatomy-text:#57575a;--anatomy-strong:#18181a;--anatomy-muted:#8c8c90;
+  --anatomy-paper:#fbfbfa;--anatomy-face:#ffffff;--anatomy-top:#ffffff;
+  --anatomy-shade-0:#dcdcd9;--anatomy-shade-1:#e5e5e2;--anatomy-shade-2:#ededea;--anatomy-shade-3:#f4f4f1;
+  --anatomy-lit-top:#ffffff;--anatomy-lit-shade:#eeeeeb;
+  --anatomy-hi:#26262a;--anatomy-mid:#8a8a8f;--anatomy-lo:#b4b4b8;--anatomy-faint:#d4d4d6;--anatomy-lit:#000000;
+  --anatomy-halo:#8a8a80;--anatomy-halo-opacity:.32;--anatomy-dot:#3a3a3e;
+  --anatomy-red:#e5484d;--anatomy-green:#30a46c;--anatomy-blue:#3e63dd;
+  --anatomy-lift:inset 0 1px 0 0 #ffffff,0 0 0 1px #0000000f,0 1px 1px -.5px #0000000a,0 3px 3px -1.5px #0000000a,0 6px 6px -3px #0000000a,0 12px 12px -6px #0000000a;
+}
+.iso-svg{display:block;width:100%;height:auto;overflow:visible}
+.iso-svg path,.iso-svg circle{vector-effect:non-scaling-stroke}
+.iso-fill{fill:var(--anatomy-paper);stroke:none}
+.iso-solid[data-lit]>.iso-fill{fill:var(--anatomy-face)}
+.iso-shade,.iso-top{stroke:none}
+.iso-shade[data-shade="0"]{fill:var(--anatomy-shade-0)}
+.iso-shade[data-shade="1"]{fill:var(--anatomy-shade-1)}
+.iso-shade[data-shade="2"]{fill:var(--anatomy-shade-2)}
+.iso-shade[data-shade="3"]{fill:var(--anatomy-shade-3)}
+.iso-top{fill:var(--anatomy-top)}
+.iso-solid[data-lit]>.iso-top{fill:var(--anatomy-lit-top)}
+.iso-solid[data-lit]>.iso-shade{fill:var(--anatomy-lit-shade)}
+.iso-solid[data-seamless]>.iso-shade,.iso-solid[data-seamless]>.iso-top{stroke-width:.4;stroke-linejoin:round}
+.iso-solid[data-seamless]>.iso-shade[data-shade="0"]{stroke:var(--anatomy-shade-0)}
+.iso-solid[data-seamless]>.iso-shade[data-shade="1"]{stroke:var(--anatomy-shade-1)}
+.iso-solid[data-seamless]>.iso-shade[data-shade="2"]{stroke:var(--anatomy-shade-2)}
+.iso-solid[data-seamless]>.iso-shade[data-shade="3"]{stroke:var(--anatomy-shade-3)}
+.iso-solid[data-seamless]>.iso-top{stroke:var(--anatomy-top)}
+.iso-solid[data-seamless][data-lit]>.iso-top{stroke:var(--anatomy-lit-top)}
+.iso-solid[data-seamless][data-lit]>.iso-shade{stroke:var(--anatomy-lit-shade)}
+.iso-solid[data-lit]>.iso-edge{stroke:var(--anatomy-lit)}
+.iso-halo{fill:var(--anatomy-halo);stroke:none;filter:blur(9px);opacity:var(--anatomy-halo-opacity);transform:translateY(3px)}
+.iso-line{fill:none;stroke:var(--anatomy-lo);stroke-width:var(--anatomy-weight);stroke-linecap:round;stroke-linejoin:round}
+.iso-line[data-tone="hi"]{stroke:var(--anatomy-hi)}
+.iso-line[data-tone="mid"]{stroke:var(--anatomy-mid)}
+.iso-line[data-tone="lo"]{stroke:var(--anatomy-lo)}
+.iso-line[data-tone="faint"]{stroke:var(--anatomy-faint)}
+.iso-line[data-tone="lit"]{stroke:var(--anatomy-lit)}
+.iso-line[data-tone="red"]{stroke:var(--anatomy-red)}
+.iso-line[data-tone="green"]{stroke:var(--anatomy-green)}
+.iso-line[data-tone="blue"]{stroke:var(--anatomy-blue)}
+.iso-line[data-dotted]{stroke-dasharray:.01 3.5;stroke-width:1}
+.iso-line[data-dashed]{stroke-dasharray:3 3}
+.iso-line[data-flow]{stroke-dasharray:2 6}
+.iso-wire-end{fill:var(--anatomy-paper);stroke:var(--anatomy-lo);stroke-width:var(--anatomy-weight)}
+.iso-wire[data-tone="hi"] .iso-wire-end{stroke:var(--anatomy-hi)}
+.iso-wire[data-tone="mid"] .iso-wire-end{stroke:var(--anatomy-mid)}
+.iso-wire[data-tone="faint"] .iso-wire-end{stroke:var(--anatomy-faint)}
+.iso-wire[data-tone="lit"] .iso-wire-end{stroke:var(--anatomy-lit)}
+.iso-dots circle{fill:var(--anatomy-dot);stroke:none;opacity:.32}
+.iso-dots[data-tone="hi"] circle{opacity:.85}
+.iso-dots[data-tone="mid"] circle{opacity:.45}
+.iso-dots[data-tone="lo"] circle{opacity:.22}
+.iso-dots[data-tone="faint"] circle{opacity:.12}
+.iso-face-text{fill:var(--anatomy-mid);font-family:var(--anatomy-mono);letter-spacing:.04em}
+.iso-face-text[data-tone="hi"]{fill:var(--anatomy-hi)}
+.iso-face-text[data-tone="lo"]{fill:var(--anatomy-lo)}
+.iso-face-text[data-tone="faint"]{fill:var(--anatomy-faint)}
+.tb-body{fill:var(--anatomy-shade-2);stroke:none}
+.tb-shine{fill:var(--anatomy-top);stroke:none}
+.tb-shade{fill:var(--anatomy-shade-0);stroke:none}
+.tb-ring{fill:none;stroke:var(--anatomy-lo);stroke-width:.45;stroke-linecap:butt;stroke-linejoin:round}
+.tb-ring[data-tone="mid"]{stroke:var(--anatomy-mid)}
+.tb-ring[data-tone="faint"]{stroke:var(--anatomy-faint)}
+.tb-ring[data-tone="hi"]{stroke:var(--anatomy-hi)}
+@keyframes iso-flow{to{stroke-dashoffset:-32}}
+@keyframes iso-pulse{0%,100%{opacity:.18}12%{opacity:1}40%{opacity:.18}}
+.iso-line[data-flow]{animation:iso-flow 1600ms linear infinite}
+.iso-dots circle[data-pulse]{animation:iso-pulse 1600ms steps(1,end) infinite;animation-delay:var(--pulse-at,0ms)}
+.iso-figure{margin:32px 0 36px}
+.iso-plate{position:relative;padding:52px 24px;border-radius:0;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-mid);--anatomy-paper:var(--anatomy-card)}
+.iso-plate-corners{position:absolute;inset:18px 20px;pointer-events:none}
+.iso-plate-corner{position:absolute;color:var(--anatomy-muted);font-family:var(--anatomy-mono);font-size:10.5px;line-height:1;letter-spacing:.04em;white-space:nowrap}
+.iso-plate-corner[data-corner="fig"]{top:0;left:0;color:var(--anatomy-text)}
+.iso-plate-corner[data-corner="title"]{top:0;right:0;text-transform:uppercase;letter-spacing:.1em}
+.iso-plate-corner[data-corner="hint"]{bottom:0;left:0;text-transform:uppercase;letter-spacing:.1em}
+.iso-plate-corner[data-corner="readout"]{right:0;bottom:0;color:var(--anatomy-text);font-variant-numeric:tabular-nums}
+.iso-plate .iso-svg{margin:0 auto}
+.iso-legend{display:grid;gap:8px;margin-top:12px;color:var(--anatomy-muted);font-size:13px;line-height:1.55}
+.iso-keys{display:flex;flex-wrap:wrap;gap:6px 18px}
+.iso-key{display:inline-flex;align-items:center;gap:7px}
+.iso-swatch{width:16px;height:10px;flex:none;overflow:visible}
+.iso-swatch path{fill:none;stroke:var(--anatomy-hi);stroke-width:1;vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round}
+.iso-swatch[data-mark="raised"] path,.iso-swatch[data-mark="flat"] path{stroke:var(--anatomy-mid)}
+.iso-swatch[data-mark="lit"] path{stroke:var(--anatomy-lit)}
+.iso-swatch[data-mark="dim"] path{stroke:var(--anatomy-lo)}
+.iso-swatch[data-mark="dotted"] path{stroke-dasharray:.01 3;stroke-width:1.4}
+.iso-swatch[data-mark="dashed"] path{stroke-dasharray:3 2.5}
+.iso-swatch[data-mark="red"] path{stroke:var(--anatomy-red)}
+.iso-swatch[data-mark="green"] path{stroke:var(--anatomy-green)}
+.iso-swatch[data-mark="blue"] path{stroke:var(--anatomy-blue)}
+.iso-swatch-crease{stroke:var(--anatomy-lo)!important}
+@media (max-width:560px){.iso-plate{padding:48px 12px 70px}.iso-plate-corner[data-corner="hint"]{bottom:18px}}
+@media (prefers-reduced-motion:reduce){.iso-line[data-flow],.iso-dots circle[data-pulse]{animation:none}}
+`;
+// LED 行扫描：74HC138 译码器选行 + 8 通道 PWM 恒流驱动器按灰度在列上灌电流。
+// 依赖：iso-kit（以 k.* 形式在本文件之前内联）。
+const k = { iso, depthOf, slabOf, cylinder, insetPlan, onTop, planOutline, lineOnTop, ring, corners, boxCorners, knurl, sideArc, haloOf, fitProjection, solidSvg, lineSvg, dotsSvg, wireSvg, faceTextSvg, topMatrix, figureSvg, plateHtml, ISO_CSS, pathOf, sideSeam, topTicks };
+
+// ---------- 模型（时间单位：GCLK 周期） ----------
+const ROWS = 8, COLS = 8;
+const BITS = 4, LEVELS = 1 << BITS;  // 演示用 4 位灰度：一个 PWM 周期 = 16 个 GCLK（真实芯片 12–16 位）
+const RT = LEVELS + 1;               // 每行 = 1 个换行消隐 GCLK + 16 个 PWM GCLK
+const MASK = [0b01100110, 0b11111111, 0b11111111, 0b11111111, 0b01111110, 0b00111100, 0b00011000, 0b00000000];
+// 灰度值 0–15：心形，从左上到右下渐亮，方便对比不同占空比
+const GS = MASK.map((m, r) => Array.from({ length: 8 }, (_, c) => ((m >> (7 - c)) & 1 ? Math.round(4 + (11 * (r + c)) / 10) : 0)).map((v) => Math.min(15, v)));
+const I_SET = 20;                    // R-EXT 设定的每通道恒流 (mA)
+const shiftAt = (b) => 2.4 + 1.6 * b;  // 第 b 个通道的灰度字到达驱动器的时刻（行内第几个 GCLK）
+const TRAVEL = 2.4;
+
+// ---------- 几何 ----------
+const W = 640, H = 350;
+const PCB = { x: -140, y: -125, w: 252, d: 200, r: 6 };
+const T = 3, FOOT = 8;
+const colX = (c) => -10 + 14 * c;
+const rowY = (r) => -40 + 14 * r;
+const colTrace = (c) => colX(c) + 5;
+const ROW_END = 99;
+const COL_TOP = -50, COL_END = 64;
+
+const P = k.fitProjection([...k.boxCorners(PCB, -T - FOOT, 0), [-131.5, -55.5, 12]], W, H, { pad: 6, azimuth: 45 });
+const at = (p) => k.iso(p, P);
+const S = (paths, o) => k.solidSvg(paths, o);
+const L = (d, o) => k.lineSvg(d, o);
+const D = (pts, o) => k.dotsSvg(pts, o);
+const poly = (pts, z = 0) => k.onTop(pts, z, P);
+const depth2 = ([x, y], z = 0) => k.depthOf([x, y, z], P);
+
+// ---------- 走线 ----------
+const sigs = [];   // {id, d}
+const traces = []; // 底色走线
+function trace(pts, { id, tone = "lo", ends = "both", layer = "top" } = {}) {
+  const sp = pts.map(([x, y]) => at([x, y, 0]));
+  traces.push(`<g data-t="${id || ""}">${k.wireSvg(sp[0], sp[sp.length - 1], { via: sp.slice(1, -1), tone: layer === "bottom" ? "faint" : tone, ends, size: 0.9 })}</g>`);
+  if (id) sigs.push({ id, d: k.pathOf(sp) });
+  return sp;
+}
+const vias = [];
+const via = (x, y) => vias.push([x, y]);
+
+// 译码器 U1 (74HC138, SOIC-16, 长轴沿 y)
+const U1 = { x: -78, y: -4, w: 14, d: 26, r: 1 };
+const u1Pin = (kk) => -1.5 + 3 * kk;
+// 驱动器 U2 (8 通道恒流灌电流驱动, SOIC-16, 长轴沿 x)
+const U2 = { x: 7, y: -95, w: 26, d: 14, r: 1 };
+const u2Pin = (kk) => 9.5 + 3 * kk;
+// MCU U3 (QFP-32)
+const U3 = { x: -106, y: -96, w: 22, d: 22, r: 1 };
+const u3Side = (kk) => -93.4 + 2.4 * kk;   // +x / -x 侧的 y
+const u3Near = (kk) => -103.4 + 2.4 * kk;  // +y / -y 侧的 x
+
+// 地址线 A0..A2：MCU 近侧 → U1 左侧引脚 1..3
+[[0, 7], [1, 6], [2, 5]].forEach(([bit, kk]) => {
+  const x = u3Near(kk), y = u1Pin(bit);
+  trace([[x, -71], [x, y], [-80.5, y]], { id: `a${bit}` });
+});
+// /E1 /E2 接地，E3 接 VCC
+for (const kk of [3, 4, 5]) { trace([[-80.5, u1Pin(kk)], [-84, u1Pin(kk)]], { ends: "from" }); via(-84.6, u1Pin(kk)); }
+// GND 引脚 8
+trace([[-80.5, u1Pin(7)], [-80.5, 24]], { ends: "from" }); via(-80.5, 24.6);
+// VCC 引脚 16
+trace([[-61.5, u1Pin(0)], [-61.5, -7]], { ends: "from" }); via(-61.5, -7.6);
+// 行选通：/Y0../Y6 在右侧 k=1..7，/Y7 在左侧 k=6
+const GATE_X = -42;
+for (let r = 0; r < 7; r++) {
+  const py = u1Pin(r + 1), gy = rowY(r) - 1.6;
+  trace([[-61.5, py], [-57, py], [-47, gy], [GATE_X, gy]], { id: `g${r}` });
+}
+trace([[-80.5, u1Pin(6)], [-86, u1Pin(6)], [-86, 31], [-58, 31], [-47, rowY(7) - 1.6], [GATE_X, rowY(7) - 1.6]], { id: "g7" });
+// 行线：PMOS 漏极 → 一整行 LED 的阳极
+for (let r = 0; r < ROWS; r++) {
+  trace([[-33, rowY(r)], [ROW_END, rowY(r)]], { id: `r${r}`, ends: "to" });
+  trace([[-42, rowY(r) + 1.6], [-45, rowY(r) + 1.6]], { ends: "to" }); // 源极 → VLED 过孔
+  via(-45.6, rowY(r) + 1.6);
+}
+// 驱动器 → 列：OUT0..3 在近侧，OUT4..7 绕过芯片右端
+for (let c = 0; c < 4; c++) {
+  const px = u2Pin(4 + c);
+  trace([[px, -78.5], [px, -64], [colTrace(c), -55], [colTrace(c), COL_TOP]], { id: `c${c}t`, ends: "from" });
+}
+for (let c = 4; c < 8; c++) {
+  const j = c - 4, px = u2Pin(7 - j), turn = -100.5 - 2.5 * j, side = 38 + 3 * j;
+  trace([[px, -97.5], [px, turn], [side, turn], [side, -64], [colTrace(c), -55], [colTrace(c), COL_TOP]], { id: `c${c}t`, ends: "from" });
+}
+for (let c = 0; c < COLS; c++) {
+  via(colTrace(c), COL_TOP);
+  trace([[colTrace(c), COL_TOP], [colTrace(c), COL_END]], { id: `c${c}b`, layer: "bottom", ends: "to" });
+  for (let r = 0; r < ROWS; r++) {
+    trace([[colX(c) + 3, rowY(r) + 2.6], [colTrace(c), rowY(r) + 2.6]], { id: `k${r}_${c}`, ends: "none" });
+    via(colTrace(c), rowY(r) + 2.6);
+  }
+}
+// MCU → 驱动器：SDI / DCLK / LE / GCLK
+const SDI = [[-81.5, u3Side(5)], [-64, u3Side(5)], [-64, -75], [u2Pin(1), -75], [u2Pin(1), -78.5]];
+trace(SDI, { id: "sdi" });
+trace([[-81.5, u3Side(6)], [-68, u3Side(6)], [-68, -72], [u2Pin(2), -72], [u2Pin(2), -78.5]], { id: "clk" });
+trace([[-81.5, u3Side(7)], [-72, u3Side(7)], [-72, -69], [u2Pin(3), -69], [u2Pin(3), -78.5]], { id: "le" });
+trace([[-81.5, u3Side(1)], [-74, u3Side(1)], [-74, -116], [u2Pin(3), -116], [u2Pin(3), -97.5]], { id: "gclk" });
+// 驱动器其余引脚
+trace([[u2Pin(0), -78.5], [6, -78.5]], { ends: "from" }); via(5.4, -78.5);           // GND
+trace([[u2Pin(0), -97.5], [u2Pin(0), -101], [4, -101]], { ends: "from" }); via(3.4, -101); // VDD
+trace([[u2Pin(1), -97.5], [u2Pin(1), -104]], { ends: "from" });                      // R-EXT
+trace([[u2Pin(1), -108.5], [u2Pin(1), -111]], { ends: "none" }); via(u2Pin(1), -111.6);
+trace([[u2Pin(2), -97.5], [u2Pin(2), -101]], { ends: "from" }); via(u2Pin(2), -101.6); // SDO 级联
+// 下载口 J1 → MCU 左侧
+for (let j = 0; j < 5; j++) {
+  const hy = -55.5 + 5 * j, my = u3Side(j + 2), x = -124 + 2.5 * j;
+  trace([[-131.5, hy], [x, hy], [x, my], [-108.5, my]], {});
+}
+// 晶振
+trace([[u3Near(3), -98.5], [u3Near(3), -106]], {});
+trace([[u3Near(5), -98.5], [u3Near(5), -106]], {});
+
+// ---------- 实体 ----------
+function board() {
+  const out = [`<path class="iso-halo" d="${k.haloOf(PCB, -T - FOOT, T, P)}"/>`];
+  const byDepth = (pts) => [...pts].sort((a, b) => depth2(a) - depth2(b));
+  for (const [x, y] of byDepth(k.corners(PCB, 8))) {
+    out.push(S(k.cylinder(x, y, 4.6, -T - FOOT, 1.4, P, 24), { tone: "lo" }));
+    out.push(S(k.cylinder(x, y, 3.4, -T - FOOT + 1.4, FOOT - 1.4, P, 6), { tone: "mid" }));
+  }
+  out.push(S(k.slabOf(PCB, -T, T, P, 8, 0.8), { tone: "mid", inner: L(k.sideSeam(PCB, -1.2, P), { tone: "faint" }) }));
+  out.push(L(k.planOutline(k.insetPlan(PCB, 3), 0, P), { tone: "faint" }));
+  for (const [x, y] of k.corners(PCB, 8)) {
+    out.push(L(k.ring(x, y, 3.6, 0, P, 24), { tone: "lo" }), L(k.ring(x, y, 2, 0, P, 20), { tone: "mid" }));
+  }
+  // 丝印：器件框
+  out.push(L(k.planOutline(k.insetPlan(U1, -5), 0, P), { tone: "faint" }));
+  out.push(L(k.planOutline(k.insetPlan(U2, -5), 0, P), { tone: "faint" }));
+  out.push(L(k.planOutline({ x: -16, y: -46, w: 116, d: 112, r: 2 }, 0, P), { tone: "faint" }));
+  // 基准点
+  for (const [x, y] of [[96, -112], [-126, 62]]) out.push(L(k.ring(x, y, 2.2, 0, P, 20), { tone: "lo" }), D([at([x, y, 0])], { size: 0.8, tone: "mid" }));
+  // 铭牌
+  const plate = { x: 54, y: -118, w: 46, d: 16, r: 1 };
+  out.push(S(k.slabOf(plate, 0, 0.4, P, 3), { tone: "lo", crease: "none" }));
+  out.push(L(k.planOutline(k.insetPlan(plate, 1.4), 0.4, P), { tone: "faint" }));
+  out.push(k.faceTextSvg(k.topMatrix([plate.x + 4, plate.y + 10], 0.4, P, "x"), "SCAN 1:8", { size: 5, tone: "lo" }));
+  return out.join("");
+}
+
+function soicPins(body, along, n, pinAt, near) {
+  // 返回 [远侧引脚, 近侧引脚]
+  const far = [], nearOut = [];
+  for (let kk = 0; kk < n; kk++) {
+    const p = pinAt(kk);
+    if (along === "y") {
+      far.push(S(k.slabOf({ x: body.x - 3, y: p - 0.6, w: 3, d: 1.2, r: 0.2 }, 0, 1, P, 2), { tone: "mid", crease: "none" }));
+      nearOut.push(S(k.slabOf({ x: body.x + body.w, y: p - 0.6, w: 3, d: 1.2, r: 0.2 }, 0, 1, P, 2), { tone: "mid", crease: "none" }));
+    } else {
+      far.push(S(k.slabOf({ x: p - 0.6, y: body.y - 3, w: 1.2, d: 3, r: 0.2 }, 0, 1, P, 2), { tone: "mid", crease: "none" }));
+      nearOut.push(S(k.slabOf({ x: p - 0.6, y: body.y + body.d, w: 1.2, d: 3, r: 0.2 }, 0, 1, P, 2), { tone: "mid", crease: "none" }));
+    }
+  }
+  return [far.join(""), nearOut.join("")];
+}
+
+function soic(body, along, pinAt, tone, part, label) {
+  const [far, near] = soicPins(body, along, 8, pinAt);
+  const top = 3.4;
+  const pin1 = along === "y" ? [body.x + 3, body.y + 3] : [body.x + 3, body.y + body.d - 3];
+  // 每种语言各画一个标签，页面按当前语言只显示一个
+  const face = (text, size) => along === "y"
+    ? k.faceTextSvg(k.topMatrix([body.x + body.w / 2 - size * 0.38, body.y + body.d / 2], top, P, "y"), text, { size, tone: "hi", anchor: "middle" })
+    : k.faceTextSvg(k.topMatrix([body.x + body.w / 2, body.y + body.d / 2 + size * 0.38], top, P, "x"), text, { size, tone: "hi", anchor: "middle" });
+  const text = Object.entries(label).map(([lang, [word, size]]) => `<g class="lang-${lang}">${face(word, size)}</g>`).join("");
+  return `<g data-part="${part}">${far}${S(k.slabOf(body, 0.4, top - 0.4, P, 4, 0.6), { tone, crease: "lo" })}` +
+    L(k.ring(pin1[0], pin1[1], 1.1, top, P, 16), { tone: "mid" }) +
+    L(k.planOutline(k.insetPlan(body, 2), top, P, 3), { tone: "faint" }) + text + `${near}</g>`;
+}
+
+function qfp() {
+  const out = [];
+  const pins = (side) => {
+    const list = [];
+    for (let kk = 0; kk < 8; kk++) {
+      const a = u3Side(kk), b = u3Near(kk);
+      const plan = side === "-x" ? { x: U3.x - 2.6, y: a - 0.5, w: 2.6, d: 1 } : side === "+x" ? { x: U3.x + U3.w, y: a - 0.5, w: 2.6, d: 1 }
+        : side === "-y" ? { x: b - 0.5, y: U3.y - 2.6, w: 1, d: 2.6 } : { x: b - 0.5, y: U3.y + U3.d, w: 1, d: 2.6 };
+      list.push(S(k.slabOf({ ...plan, r: 0.2 }, 0, 0.8, P, 2), { tone: "mid", crease: "none" }));
+    }
+    return list.join("");
+  };
+  out.push(pins("-x"), pins("-y"));
+  out.push(S(k.slabOf(U3, 0.4, 2.6, P, 4, 0.6), { tone: "mid", crease: "lo" }));
+  out.push(L(k.ring(U3.x + 3.5, U3.y + 3.5, 1.2, 3, P, 16), { tone: "mid" }));
+  out.push(L(k.planOutline(k.insetPlan(U3, 2.4), 3, P, 3), { tone: "faint" }));
+  out.push(k.faceTextSvg(k.topMatrix([U3.x + U3.w / 2, U3.y + U3.d / 2 + 1.6], 3, P, "x"), "MCU", { size: 4.6, tone: "mid", anchor: "middle" }));
+  out.push(pins("+x"), pins("+y"));
+  return `<g data-part="mcu">${out.join("")}</g>`;
+}
+
+function pmos(r) {
+  const y = rowY(r);
+  const body = { x: -40, y: y - 3, w: 6, d: 6, r: 0.6 };
+  return `<g data-part="pmos">` + [
+    S(k.slabOf({ x: -42.4, y: y - 2.2, w: 2.4, d: 1.2, r: 0.2 }, 0, 0.9, P, 2), { tone: "mid", crease: "none" }),
+    S(k.slabOf({ x: -42.4, y: y + 1, w: 2.4, d: 1.2, r: 0.2 }, 0, 0.9, P, 2), { tone: "mid", crease: "none" }),
+    `<g data-pmos="${r}">${S(k.slabOf(body, 0.3, 1.7, P, 3, 0.4), { tone: "mid" })}</g>`,
+    S(k.slabOf({ x: -34, y: y - 0.6, w: 2.4, d: 1.2, r: 0.2 }, 0, 0.9, P, 2), { tone: "mid", crease: "none" }),
+  ].join("") + `</g>`;
+}
+
+function led(r, c) {
+  const x = colX(c), y = rowY(r);
+  const body = { x: x - 3.5, y: y - 3.5, w: 7, d: 7, r: 0.8 };
+  const lens = k.cylinder(x, y, 2.5, 2, 0.5, P, 28);
+  const [bx, by] = at([x, y, 2.5]);
+  return `<g data-led="${r}_${c}">` +
+    S(k.slabOf(body, 0, 2, P, 3, 0.4), { tone: "mid" }) +
+    L(k.lineOnTop([x + 2.4, y - 3.5], [x + 3.5, y - 2.4], 2, P), { tone: "lo" }) +
+    S(lens, { tone: "hi", crease: "lo" }) +
+    `<path class="led-lens" d="${lens.top}"/><circle class="led-bloom" cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="7"/>` +
+    `<path class="led-sel" d="${k.planOutline(k.insetPlan(body, -1.2), 0, P, 3)}"/>` +
+    `<path class="led-hit" d="${k.slabOf(body, 0, 2.6, P, 3).fill}"/></g>`;
+}
+
+function chipCap(plan, along) {
+  const ends = along === "x"
+    ? [{ x: plan.x, y: plan.y, w: 1, d: plan.d }, { x: plan.x + plan.w - 1, y: plan.y, w: 1, d: plan.d }]
+    : [{ x: plan.x, y: plan.y, w: plan.w, d: 1 }, { x: plan.x, y: plan.y + plan.d - 1, w: plan.w, d: 1 }];
+  return S(k.slabOf({ ...plan, r: 0.3 }, 0, 1.4, P, 2), { tone: "mid", crease: "none" }) +
+    ends.map((e) => S(k.slabOf({ ...e, r: 0.2 }, 0, 1.5, P, 2), { tone: "lo", crease: "none" })).join("");
+}
+
+function crystal() {
+  const plan = { x: -101, y: -113, w: 12, d: 7, r: 2.4 };
+  return S(k.slabOf(plan, 0, 0.6, P, 4), { tone: "lo", crease: "none" }) +
+    S(k.slabOf(k.insetPlan(plan, 0.6), 0.6, 2.6, P, 4, 0.5), { tone: "mid" });
+}
+
+function header() {
+  const body = { x: -134, y: -58, w: 5, d: 25, r: 0.6 };
+  const out = [S(k.slabOf(body, 0, 4.4, P, 2, 0.4), { tone: "lo" })];
+  for (let j = 0; j < 5; j++) {
+    const y = -55.5 + 5 * j;
+    out.push(L(k.planOutline({ x: body.x + 0.6, y: y - 2.2, w: 3.8, d: 4.4, r: 0.3 }, 4.4, P, 2), { tone: "faint" }));
+    out.push(S(k.slabOf({ x: -132.1, y: y - 0.6, w: 1.2, d: 1.2, r: 0.1 }, 4.4, 7, P, 1), { tone: "mid", crease: "none" }));
+  }
+  return out.join("");
+}
+
+// ---------- 画面装配 ----------
+const items = [];
+const put = (center, svg) => items.push({ d: depth2(center), svg });
+put([-71, 9], soic(U1, "y", u1Pin, "hi", "decoder", { zh: ["译码IC", 4.2], en: ["DECODER", 3.4], de: ["DECODER", 3.4] }));
+put([20, -88], soic(U2, "x", u2Pin, "hi", "driver", { zh: ["驱动IC", 4.2], en: ["DRIVER", 3.6], de: ["TREIBER", 3.4] }));
+put([-95, -85], qfp());
+for (let r = 0; r < ROWS; r++) put([-37, rowY(r)], pmos(r));
+for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) put([colX(c), rowY(c >= 0 ? r : r)], led(r, c));
+put([-95, -109], crystal());
+put([-131.5, -45], header());
+put([-86, -104], chipCap({ x: -87.5, y: -107, w: 3, d: 5 }, "y"));
+put([-71, -15], chipCap({ x: -73.5, y: -16.5, w: 5, d: 3 }, "x"));
+put([-2, -98], chipCap({ x: -3.5, y: -100.5, w: 3, d: 5 }, "y"));
+put([12.5, -106], chipCap({ x: 11, y: -108.6, w: 3, d: 5 }, "y")); // R-EXT（0603 电阻）
+items.sort((a, b) => a.d - b.d);
+
+const viaSvg = L(vias.map(([x, y]) => k.ring(x, y, 1.2, 0, P, 12)).join(""), { tone: "lo" }) + D(vias.map(([x, y]) => at([x, y, 0])), { size: 0.45, tone: "lo" });
+const sigSvg = sigs.map((s) => `<path class="sig" data-sig="${s.id}" d="${s.d}"/>`).join("");
+const bitSvg = Array.from({ length: 8 }, (_, b) => `<circle class="bit" data-bit="${b}" r="1.7" cx="-99" cy="-99"/>`).join("");
+
+
+const svg = k.figureSvg({
+  width: W, height: H,
+  label: "一块 8×8 LED 点阵电路板：MCU 用 3 位地址让 74HC138 译码器选通一行，PMOS 给这一行供电；PWM 恒流驱动器在每个 GCLK 上计数，计数值小于该列灰度值时就在这一列灌入恒定电流，交叉点的 LED 点亮。",
+  body: [board(), traces.join(""), viaSvg, `<g class="sigs">${sigSvg}</g>`, `<g class="bits">${bitSvg}</g>`, items.map((i) => i.svg).join("")],
+});
+
+// ---------- 文案：中文 / Deutsch ----------
+const I18N = {
+  zh: {
+    htmlLang: "zh-CN",
+    switchTo: "DE",
+    switchLabel: "Auf Deutsch umschalten",
+    docTitle: "LED 屏是怎么亮起来的？",
+    h1: "LED 屏是怎么亮起来的？",
+    lede: "零基础也能看懂：跟着下面 9 步，认识 LED 屏里的两颗关键芯片——<b>译码 IC</b> 和 <b>LED 驱动 IC</b>。每一步只讲一件事，图上会把相关部分高亮。",
+    fig1Title: "LED 点阵板",
+    fig1Hint: "按“下一步”跟着看",
+    prev: "← 上一步",
+    next: "下一步 →",
+    kicker: (i, n) => `第 ${i} 步 / 共 ${n} 步`,
+    termsTitle: "术语小抄",
+    terms: [
+      ["LED", "发光二极管。电流只能从一个方向流过它，流过时就亮。"],
+      ["MCU", "单片机，整块板的“大脑”，负责发出各种指令。"],
+      ["译码 IC", "“8 选 1 开关”。收到一个 0–7 的号码，就打开对应的那一行。"],
+      ["LED 驱动 IC", "管“列”的芯片：决定每一列亮不亮、亮多久，并保证电流恒定（恒流）。"],
+      ["行扫", "一次只亮一行，8 行轮流亮。8 行轮流叫“1/8 扫”。"],
+      ["刷新率", "一秒钟把整幅画面（8 行）轮完多少遍，单位 Hz。≥ 约 100 Hz 时眼睛看不出闪。"],
+      ["PWM / 占空比", "靠“亮一会儿、灭一会儿”来调亮度。亮的时间占的比例就是占空比，比例越大越亮。"],
+      ["GCLK", "灰度时钟，驱动 IC 的“节拍器”。每一拍计数器 +1，用来数亮了几格。"],
+    ],
+    advSummary: "进阶：一行的完整时序图（给想深入的人）",
+    advText: `刷新率 = GCLK 频率 ÷（每行拍数 × 行数）= GCLK ÷ (${RT} × 8)。真实芯片常用 12–16 位灰度、1/16–1/32 扫，直接这样算 GCLK 会高得离谱，所以 MBI5153、ICN2053 这类芯片会把一个 PWM 周期“打散”成很多小段穿插在各行之间（scrambled PWM），在同样的 GCLK 下把刷新率提高几十倍。本页为了好懂，用 4 位灰度、不打散。`,
+    fig2Title: "一行的时序",
+    fig2Hint: "示波器视角",
+    fig2Caption: "横轴是时间，一格 = 1 个 GCLK。每行先用 1 拍换行（LE 锁存新数据、地址切到下一行），之后 16 拍是 PWM：计数器 0→15，OUTn 在“计数 < 该通道灰度值 GS”时导通。导通拍数 = GS，所以行内占空比 = GS ÷ 16。",
+    steps: [
+      {
+        title: "64 颗灯，只用 16 根线",
+        say: `<p>板子中间是 <b>64 颗 LED 小灯</b>，排成 8 行 × 8 列，现在显示的是一颗心。</p>
+<p>如果每颗灯都单独拉一根线来控制，需要 64 根线。可这块板只用了 <b>8 根行线 + 8 根列线 = 16 根</b>。</p>
+<p>秘密在两颗芯片：左边的 <b>译码 IC</b> 管“行”，上面的 <b>驱动 IC</b> 管“列”。最上面的 <b>MCU</b>（单片机）是总指挥。接下来一步一步看它们怎么配合。</p>`,
+      },
+      {
+        title: "一颗灯是怎么亮的",
+        say: `<p>LED 像一根<b>单向水管</b>：电流从<b>行线</b>流进来，穿过灯，再从<b>列线</b>流走。</p>
+<p>所以必须同时满足两件事：<b>它所在的行通了电</b>，<b>它所在的列也接通了</b>。行和列交叉的那一颗才会亮。</p>`,
+        try: "点一下板上任意一颗灯，看看是哪根行线、哪根列线在工作。",
+      },
+      {
+        title: "译码 IC：决定亮哪一行",
+        say: `<p>左边这颗是 <b>译码 IC</b>（常见型号 74HC138）。MCU 只用 <b>3 根线</b>给它报一个号码：每根线有电是 1、没电是 0，3 根线能组合出 000～111 共 <b>8 个号码</b>。</p>
+<p>译码 IC 收到号码，就<b>只打开对应的那一行</b>，其余 7 行全部关闭——就像电梯里按楼层按钮，一次只到一层。</p>`,
+        try: "看下面的 3 个格子：号码一变，板子上亮的那一行就跟着换。",
+      },
+      {
+        title: "驱动 IC：决定这一行哪几颗亮",
+        say: `<p>上面这颗是 <b>LED 驱动 IC</b>，它管 8 根列线，每根列线后面都有一个“电流阀门”。</p>
+<p>MCU 先把“哪几列要亮”的数据<b>一位一位</b>送进去（看那串沿线移动的小圆点），驱动 IC 收齐后，一起打开对应的阀门。</p>
+<p>它还有个本事叫<b>恒流</b>：不管电源电压怎么波动，每颗灯的电流都稳定在设定值（例如 20 mA），所以灯和灯之间亮度一致。</p>`,
+      },
+      {
+        title: "行扫：一行一行轮流亮",
+        say: `<p>问题来了：译码 IC 一次只能打开<b>一行</b>，那整颗心怎么显示？</p>
+<p>答案是<b>轮流</b>：先亮第 0 行，再亮第 1 行……亮完第 7 行再从头来。每换一行，驱动 IC 也同时换上这一行的数据。</p>
+<p>这就叫<b>行扫描</b>（行扫）。8 行轮流叫 <b>1/8 扫</b>——每一行只有 1/8 的时间在亮。</p>`,
+      },
+      {
+        title: "扫得够快，眼睛就被“骗”了",
+        say: `<p>把轮流的速度加快。快到一定程度，眼睛跟不上，就会把 8 行“叠”在一起，看到一整颗心。这叫<b>视觉暂留</b>。</p>
+<p>一秒钟把 8 行完整轮完多少遍，叫<b>刷新率</b>，单位 Hz。低于约 50 Hz 会明显闪；<b>100 Hz 以上</b>看起来就稳定了。</p>`,
+        try: "它会自动加速；你也可以拖动滑块，找找从“闪”到“不闪”的那个点。",
+      },
+      {
+        title: "亮度：PWM 与占空比",
+        say: `<p>LED 只有<b>亮、灭</b>两种状态，那“半亮”怎么做？</p>
+<p>办法是<b>快速开关</b>：把一段时间切成 16 小格，比如亮 12 格、灭 4 格。亮的比例 12 ÷ 16 = 75%，开关快到眼睛分不出时，看起来就是 75% 的亮度。</p>
+<p>这个“亮的比例”叫<b>占空比</b>，这种调亮度的方法叫 <b>PWM</b>（脉冲宽度调制）。注意：电流大小一直不变，变的只是亮多久。</p>`,
+        try: "点不同的灯比较它们亮几格。慢速时能看到灯一闪一闪；把滑块拖到右边，就变成稳定的亮度。",
+      },
+      {
+        title: "GCLK：数格子的节拍器",
+        say: `<p>那 16 小格由谁来数？就是 <b>GCLK</b>（灰度时钟）。它像<b>节拍器</b>，每“嘀”一下，驱动 IC 里的计数器就 +1：0、1、2……15，然后进入下一行。</p>
+<p>每一列都记着自己的一个数字，叫<b>灰度值</b>（0～15）。规则只有一条：<b>计数还没到这个数字，灯亮；到了，灯灭</b>。数字越大，亮的格子越多，灯越亮。</p>
+<p>GCLK 越快，一行用的时间越短，<b>刷新率就越高</b>。</p>`,
+        try: "盯着下面的计数器：数到这颗灯的灰度值时，它就熄灭。点同一行的其他灯比较一下。",
+      },
+      {
+        title: "全部合起来",
+        say: `<ol style="margin:0;padding-left:20px">
+<li><b>MCU</b> 把每一行的灰度数据送进<b>驱动 IC</b>；</li>
+<li><b>译码 IC</b> 按号码轮流打开每一行——<b>行扫</b>；</li>
+<li>每一行的时间里，<b>GCLK</b> 打 16 拍，驱动 IC 让每列亮“灰度值”那么多拍——<b>PWM 占空比</b>决定亮度；</li>
+<li>8 行轮完是一帧，一秒能轮很多遍——<b>刷新率</b>够高，眼睛就看到一颗有明有暗、不闪的心。</li></ol>`,
+        try: "自由玩：调速度、点灯看数值。想看工程师用的时序图，展开页面最下面的“进阶”。",
+      },
+    ],
+    // 角标
+    roRefresh: (hz) => `刷新 ${hz} Hz`,
+    roLit: (r) => `正在亮：第 ${r} 行`,
+    roPowered: (r) => `第 ${r} 行通电`,
+    roSwitch: " · 换行",
+    roCount: (n) => ` · 计数 ${n}`,
+    // 小组件
+    slow: "慢",
+    fast: "快",
+    speedScan: "扫描速度",
+    speedSwitch: "开关速度",
+    addrLabel: "MCU 报的号码：",
+    addrRes: (r) => `第 ${r} 行打开`,
+    colsLabel: (r) => `第 ${r} 行的数据：`,
+    colName: (c) => `列${c}`,
+    colsNote: (r, n) => `1 = 打开这一列，0 = 关闭。所以第 ${r} 行亮 ${n} 颗灯。`,
+    scanLabel: "正在亮：",
+    scanFast: "太快了，看不清在亮哪行",
+    scanRow: (r) => `第 ${r} 行`,
+    refreshUnit: "刷新率（每秒轮完几遍）",
+    verdict: ["很慢：能看到一行一行在走", "会闪烁", "轻微闪烁", "稳定不闪 ✓"],
+    capZero: (r, c) => `第 ${r} 行第 ${c} 列：灰度值 0，一格都不亮。换一颗心形里的灯试试。`,
+    cap: (r, c, g, pct) => `第 ${r} 行第 ${c} 列：灰度值 <b>${g}</b> → 16 格里亮 ${g} 格 → 占空比 <b>${pct}%</b>`,
+    capSwitch: "　（换行：计数清零）",
+    capCount: (n, g, on) => `　｜ 计数 ${n} ${on ? "&lt;" : "≥"} ${g} → 灯${on ? "<b>亮</b>" : "灭"}`,
+    countLabel: "GCLK 计数",
+    countSwitch: "换行",
+    refreshLabel: "刷新率",
+    statF: "GCLK：每拍计数 +1",
+    statScan: (rr) => `行扫：行频 ${rr}，每行亮 1/8 时间`,
+    statRefresh: `刷新率 = GCLK ÷ (${RT}×8)`,
+    statDuty: (r, c, g) => `所选灯（${r},${c}）GS=${g}：行内 → 算上行扫`,
+    // 时序图
+    lanes: ["GCLK", "LE", "行选", "计数"],
+    busRow: (r, a) => `第 ${r} 行 · A=${a}`,
+    busSwitch: "换",
+    scopeRo: (r) => `第 ${r} 行 · 1 格 = 1 GCLK`,
+  },
+
+  en: {
+    htmlLang: "en",
+    docTitle: "How does an LED display light up?",
+    h1: "How does an LED display light up?",
+    lede: "No background needed: in 9 steps you'll meet the two key chips inside an LED display – the <b>decoder IC</b> and the <b>LED driver IC</b>. Each step explains one thing, and the board highlights the parts that matter.",
+    fig1Title: "LED matrix board",
+    fig1Hint: "Click “Next” to follow along",
+    prev: "← Back",
+    next: "Next →",
+    kicker: (i, n) => `Step ${i} of ${n}`,
+    termsTitle: "Cheat sheet",
+    terms: [
+      ["LED", "Light-emitting diode. Current can only flow through it in one direction – and when it does, it lights up."],
+      ["MCU", "Microcontroller – the “brain” of the board that gives all the commands."],
+      ["Decoder IC", "A “1-of-8 switch”: it receives a number from 0 to 7 and turns on the matching row."],
+      ["LED driver IC", "The chip for the columns: it decides whether and how long each column is on, and keeps the current constant (constant current)."],
+      ["Row scanning", "Only one row is lit at a time; the 8 rows take turns. With 8 rows this is called “1/8 scan”."],
+      ["Refresh rate", "How many times per second the whole picture (all 8 rows) is drawn, in Hz. Above about 100 Hz the eye sees no flicker."],
+      ["PWM / duty cycle", "Brightness by “on for a bit, off for a bit”. The share of on-time is the duty cycle – the larger it is, the brighter the LED."],
+      ["GCLK", "Grayscale clock, the driver IC's “metronome”. Every tick adds 1 to a counter, which is how the lit slots are counted."],
+    ],
+    advSummary: "Advanced: the full timing of one row",
+    advText: `Refresh rate = GCLK frequency ÷ (ticks per row × rows) = GCLK ÷ (${RT} × 8). Real chips usually use 12–16-bit grayscale and 1/16 to 1/32 scan, which would make the required GCLK absurdly high if calculated this way. Drivers such as the MBI5153 or ICN2053 therefore split one PWM cycle into many short segments spread across the rows (scrambled PWM), multiplying the refresh rate for the same GCLK. To keep things easy to follow, this page uses 4 bits without scrambling.`,
+    fig2Title: "Timing of one row",
+    fig2Hint: "Oscilloscope view",
+    fig2Caption: "Time runs to the right; one cell = 1 GCLK. Each row starts with 1 tick for the row change (LE latches the new data, the address moves to the next row). Then come 16 PWM ticks: the counter runs from 0 to 15, and OUTn is on while “counter < grayscale value GS” of that channel. So the number of on-ticks equals GS, and the duty cycle within the row is GS ÷ 16.",
+    steps: [
+      {
+        title: "64 LEDs, only 16 wires",
+        say: `<p>In the middle of the board are <b>64 small LEDs</b> in 8 rows × 8 columns – right now they show a heart.</p>
+<p>Wiring every LED separately would take 64 wires. This board gets by with <b>8 row wires + 8 column wires = 16</b>.</p>
+<p>The secret is two chips: the <b>decoder IC</b> on the left handles the rows, the <b>driver IC</b> at the top handles the columns. The <b>MCU</b> (microcontroller) at the very top is the conductor. Let's see, step by step, how they work together.</p>`,
+      },
+      {
+        title: "How a single LED lights up",
+        say: `<p>An LED is like a <b>one-way water pipe</b>: current flows in through the <b>row wire</b>, passes through the LED and flows out through the <b>column wire</b>.</p>
+<p>So two things must be true at once: <b>its row is powered</b> and <b>its column is switched on</b>. Only the LED where the two cross lights up.</p>`,
+        try: "Click any LED on the board and see which row wire and which column wire are working.",
+      },
+      {
+        title: "Decoder IC: which row is on?",
+        say: `<p>On the left is the <b>decoder IC</b> (a common part is the 74HC138). The MCU tells it a number using just <b>3 wires</b>: each wire is either on (1) or off (0). Three wires give 000 to 111 – exactly <b>8 numbers</b>.</p>
+<p>The decoder then turns on <b>only the matching row</b> and keeps the other 7 off – like the floor buttons in a lift: one floor at a time.</p>`,
+        try: "Watch the 3 boxes below: as soon as the number changes, the lit row on the board moves with it.",
+      },
+      {
+        title: "Driver IC: which LEDs in the row are on?",
+        say: `<p>At the top is the <b>LED driver IC</b>. It looks after the 8 column wires; behind each one sits a kind of “current valve”.</p>
+<p>First the MCU shifts in, <b>bit by bit</b>, which columns should light (the little dots travelling along the wire). Once the driver has all of them, it opens the matching valves together.</p>
+<p>It also provides <b>constant current</b>: however the supply voltage wobbles, each LED gets exactly the set current (e.g. 20 mA) – so they all look equally bright.</p>`,
+      },
+      {
+        title: "Row scanning: one row after another",
+        say: `<p>Now the big question: the decoder can only turn on <b>one row</b> at a time. So how does the whole heart appear?</p>
+<p>The answer: <b>take turns</b>. First row 0 lights, then row 1 … up to row 7, then it starts again. At every row change the driver also gets that row's data.</p>
+<p>This is called <b>row scanning</b> (multiplexing). With 8 rows it's a <b>1/8 scan</b> – each row is lit only 1/8 of the time.</p>`,
+      },
+      {
+        title: "Fast enough – and the eye is fooled",
+        say: `<p>Now let's speed it up. Past a certain speed the eye can't keep up and “stacks” the 8 rows into one whole heart. This is called <b>persistence of vision</b>.</p>
+<p>How many times per second all 8 rows are fully drawn is the <b>refresh rate</b>, in Hz. Below about 50 Hz it clearly flickers; <b>above about 100 Hz</b> the picture looks steady.</p>`,
+        try: "It speeds up on its own – or drag the slider and find the point where the flicker disappears.",
+      },
+      {
+        title: "Brightness: PWM and duty cycle",
+        say: `<p>An LED only knows <b>on</b> and <b>off</b>. So how do you get “half bright”?</p>
+<p>The trick is <b>switching quickly</b>: split a stretch of time into 16 slots – say 12 on and 4 off. The on-share is 12 ÷ 16 = 75 %; switch fast enough and the eye sees 75 % brightness.</p>
+<p>This on-share is the <b>duty cycle</b>, and the method is called <b>PWM</b> (pulse-width modulation). Note: the current itself never changes – only how long it flows.</p>`,
+        try: "Click different LEDs and compare how many slots they're on. At slow speed you see them blink; drag the slider to the right and it turns into steady brightness.",
+      },
+      {
+        title: "GCLK: the metronome that counts the slots",
+        say: `<p>Who counts the 16 slots? That's the <b>GCLK</b> (grayscale clock). It's like a <b>metronome</b>: with every “tick” a counter inside the driver IC goes up by 1 – 0, 1, 2 … 15, then the next row begins.</p>
+<p>Each column remembers its own number, the <b>grayscale value</b> (0–15). There's just one rule: <b>while the counter is below that number, the LED is on; once it reaches it, the LED goes off.</b> The bigger the number, the more slots are lit and the brighter the LED.</p>
+<p>The faster the GCLK, the shorter each row takes – and the <b>higher the refresh rate</b>.</p>`,
+        try: "Watch the counter below: when it reaches this LED's grayscale value, the LED goes off. Click other LEDs in the same row to compare.",
+      },
+      {
+        title: "Putting it all together",
+        say: `<ol style="margin:0;padding-left:20px">
+<li>The <b>MCU</b> shifts each row's grayscale data into the <b>driver IC</b>;</li>
+<li>the <b>decoder IC</b> turns the rows on one after another – <b>row scanning</b>;</li>
+<li>during each row the <b>GCLK</b> ticks 16 times, and the driver keeps each column on for as many ticks as its grayscale value – the <b>duty cycle</b> sets the brightness;</li>
+<li>8 rows make one frame, drawn many times per second – with a high enough <b>refresh rate</b> the eye sees a steady heart with bright and dim parts.</li></ol>`,
+        try: "Play freely: change the speed, click LEDs, read the numbers. The engineer's timing diagram is under “Advanced” at the bottom of the page.",
+      },
+    ],
+    roRefresh: (hz) => `Refresh ${hz} Hz`,
+    roLit: (r) => `Lit: row ${r}`,
+    roPowered: (r) => `Row ${r} powered`,
+    roSwitch: " · row change",
+    roCount: (n) => ` · count ${n}`,
+    slow: "slow",
+    fast: "fast",
+    speedScan: "Scan speed",
+    speedSwitch: "Switching speed",
+    addrLabel: "Number from the MCU:",
+    addrRes: (r) => `row ${r} on`,
+    colsLabel: (r) => `Data for row ${r}:`,
+    colName: (c) => `C${c}`,
+    colsNote: (r, n) => `1 = column on, 0 = column off. So ${n} LEDs light up in row ${r}.`,
+    scanLabel: "Lit now:",
+    scanFast: "too fast to tell which row",
+    scanRow: (r) => `row ${r}`,
+    refreshUnit: "refresh rate (full passes per second)",
+    verdict: ["very slow: you can see the rows move", "flickers", "slight flicker", "steady, no flicker ✓"],
+    capZero: (r, c) => `Row ${r}, column ${c}: grayscale value 0 – no slot is lit. Try an LED inside the heart.`,
+    cap: (r, c, g, pct) => `Row ${r}, column ${c}: grayscale value <b>${g}</b> → ${g} of 16 slots on → duty cycle <b>${pct} %</b>`,
+    capSwitch: "　(row change: counter reset)",
+    capCount: (n, g, on) => `　| count ${n} ${on ? "&lt;" : "≥"} ${g} → LED ${on ? "<b>on</b>" : "off"}`,
+    countLabel: "GCLK count",
+    countSwitch: "change",
+    refreshLabel: "Refresh rate",
+    statF: "GCLK: every tick counts +1",
+    statScan: (rr) => `Row scan: row rate ${rr}, each row lit 1/8 of the time`,
+    statRefresh: `Refresh = GCLK ÷ (${RT}×8)`,
+    statDuty: (r, c, g) => `Selected LED (${r},${c}) GS=${g}: within row → with scanning`,
+    lanes: ["GCLK", "LE", "Row", "Count"],
+    busRow: (r, a) => `Row ${r} · A=${a}`,
+    busSwitch: "Δ",
+    scopeRo: (r) => `Row ${r} · 1 cell = 1 GCLK`,
+  },
+
+  de: {
+    htmlLang: "de",
+    switchTo: "中文",
+    switchLabel: "切换到中文",
+    docTitle: "Wie leuchtet ein LED-Display?",
+    h1: "Wie leuchtet ein LED-Display?",
+    lede: "Ganz ohne Vorkenntnisse: In 9 Schritten lernst du die zwei wichtigsten Chips in einem LED-Display kennen – den <b>Decoder-IC</b> und den <b>LED-Treiber-IC</b>. Jeder Schritt erklärt genau eine Sache, und auf der Platine wird hervorgehoben, worum es gerade geht.",
+    fig1Title: "LED-Matrix-Platine",
+    fig1Hint: "Mit „Weiter“ durchklicken",
+    prev: "← Zurück",
+    next: "Weiter →",
+    kicker: (i, n) => `Schritt ${i} von ${n}`,
+    termsTitle: "Begriffe kurz erklärt",
+    terms: [
+      ["LED", "Leuchtdiode. Strom kann nur in eine Richtung hindurchfließen – dann leuchtet sie."],
+      ["MCU", "Mikrocontroller, das „Gehirn“ der Platine, das alle Befehle gibt."],
+      ["Decoder-IC", "Ein „1-aus-8-Schalter“: Er bekommt eine Nummer von 0 bis 7 und schaltet die passende Zeile ein."],
+      ["LED-Treiber-IC", "Der Chip für die Spalten: Er entscheidet, ob und wie lange jede Spalte leuchtet, und hält den Strom konstant (Konstantstrom)."],
+      ["Zeilen-Multiplexing", "Es leuchtet immer nur eine Zeile; die 8 Zeilen kommen der Reihe nach dran. Bei 8 Zeilen heißt das „1/8-Scan“."],
+      ["Bildwiederholrate", "Wie oft pro Sekunde das ganze Bild (alle 8 Zeilen) durchlaufen wird, in Hz. Ab etwa 100 Hz sieht das Auge kein Flimmern mehr."],
+      ["PWM / Tastgrad", "Helligkeit durch „kurz an, kurz aus“. Der Anteil der Einschaltzeit ist der Tastgrad – je größer, desto heller."],
+      ["GCLK", "Graustufentakt, das „Metronom“ des Treiber-ICs. Jeder Takt erhöht einen Zähler um 1; so werden die leuchtenden Felder gezählt."],
+    ],
+    advSummary: "Für Fortgeschrittene: das komplette Timing einer Zeile",
+    advText: `Bildwiederholrate = GCLK-Frequenz ÷ (Takte pro Zeile × Zeilen) = GCLK ÷ (${RT} × 8). Echte Chips arbeiten meist mit 12–16 Bit Graustufen und 1/16- bis 1/32-Scan – so gerechnet wäre der nötige GCLK absurd hoch. Treiber wie MBI5153 oder ICN2053 zerlegen den PWM-Zyklus deshalb in viele kurze Abschnitte, die über die Zeilen verteilt werden (Scrambled PWM), und erreichen so beim gleichen GCLK eine um ein Vielfaches höhere Bildwiederholrate. Diese Seite nutzt der Verständlichkeit halber 4 Bit ohne Aufteilung.`,
+    fig2Title: "Timing einer Zeile",
+    fig2Hint: "Oszilloskop-Ansicht",
+    fig2Caption: "Die Zeit läuft nach rechts, ein Feld = 1 GCLK. Jede Zeile beginnt mit 1 Takt für den Zeilenwechsel (LE übernimmt die neuen Daten, die Adresse springt zur nächsten Zeile). Danach folgen 16 PWM-Takte: Der Zähler läuft von 0 bis 15, und OUTn ist durchgeschaltet, solange „Zähler < Graustufenwert GS“ dieses Kanals gilt. Die Zahl der Einschalttakte ist also GS, der Tastgrad innerhalb der Zeile GS ÷ 16.",
+    steps: [
+      {
+        title: "64 LEDs, aber nur 16 Leitungen",
+        say: `<p>In der Mitte der Platine sitzen <b>64 kleine LEDs</b> in 8 Zeilen × 8 Spalten – gerade zeigen sie ein Herz.</p>
+<p>Würde man jede LED einzeln verdrahten, bräuchte man 64 Leitungen. Diese Platine kommt mit <b>8 Zeilenleitungen + 8 Spaltenleitungen = 16</b> aus.</p>
+<p>Das Geheimnis sind zwei Chips: Der <b>Decoder-IC</b> links ist für die Zeilen zuständig, der <b>Treiber-IC</b> oben für die Spalten. Ganz oben sitzt der <b>MCU</b> (Mikrocontroller) – der Dirigent. Schauen wir Schritt für Schritt, wie sie zusammenspielen.</p>`,
+      },
+      {
+        title: "Wie leuchtet eine einzelne LED?",
+        say: `<p>Eine LED ist wie ein <b>Wasserrohr mit Rückschlagventil</b>: Der Strom fließt über die <b>Zeilenleitung</b> hinein, durch die LED hindurch und über die <b>Spaltenleitung</b> wieder hinaus.</p>
+<p>Es müssen also zwei Dinge gleichzeitig stimmen: <b>Ihre Zeile hat Spannung</b> und <b>ihre Spalte ist durchgeschaltet</b>. Nur die LED an der Kreuzung leuchtet.</p>`,
+        try: "Klicke auf eine beliebige LED und sieh nach, welche Zeilen- und welche Spaltenleitung gerade arbeiten.",
+      },
+      {
+        title: "Decoder-IC: Welche Zeile leuchtet?",
+        say: `<p>Links sitzt der <b>Decoder-IC</b> (typisch: 74HC138). Der MCU nennt ihm über nur <b>3 Leitungen</b> eine Nummer: Jede Leitung ist entweder an (1) oder aus (0). Drei Leitungen ergeben 000 bis 111 – genau <b>8 Nummern</b>.</p>
+<p>Der Decoder schaltet dann <b>nur die passende Zeile</b> ein, die anderen 7 bleiben aus – wie die Stockwerkstasten im Aufzug: immer nur ein Stockwerk auf einmal.</p>`,
+        try: "Achte auf die 3 Kästchen unten: Sobald sich die Nummer ändert, springt die leuchtende Zeile mit.",
+      },
+      {
+        title: "Treiber-IC: Welche LEDs der Zeile leuchten?",
+        say: `<p>Oben sitzt der <b>LED-Treiber-IC</b>. Er kümmert sich um die 8 Spaltenleitungen; hinter jeder steckt eine Art „Stromventil“.</p>
+<p>Der MCU schiebt ihm zuerst <b>Bit für Bit</b> hinein, welche Spalten leuchten sollen (die kleinen Punkte, die entlang der Leitung wandern). Hat der Treiber alles beisammen, öffnet er die passenden Ventile gleichzeitig.</p>
+<p>Außerdem liefert er <b>Konstantstrom</b>: Egal wie die Versorgungsspannung schwankt, durch jede LED fließt genau der eingestellte Strom (z. B. 20 mA) – deshalb leuchten alle gleich hell.</p>`,
+      },
+      {
+        title: "Multiplexing: eine Zeile nach der anderen",
+        say: `<p>Jetzt die entscheidende Frage: Der Decoder kann immer nur <b>eine Zeile</b> einschalten. Wie entsteht dann das ganze Herz?</p>
+<p>Die Antwort: <b>der Reihe nach</b>. Erst leuchtet Zeile 0, dann Zeile 1 … bis Zeile 7, dann geht es von vorn los. Bei jedem Zeilenwechsel bekommt der Treiber die Daten der neuen Zeile.</p>
+<p>Das nennt man <b>Zeilen-Multiplexing</b> (Zeilenscan). Bei 8 Zeilen spricht man vom <b>1/8-Scan</b> – jede Zeile leuchtet nur 1/8 der Zeit.</p>`,
+      },
+      {
+        title: "Schnell genug – und das Auge wird getäuscht",
+        say: `<p>Jetzt wird es schneller. Ab einem gewissen Tempo kommt das Auge nicht mehr mit und „stapelt“ die 8 Zeilen zu einem ganzen Herz. Das ist die <b>Trägheit des Auges</b>.</p>
+<p>Wie oft pro Sekunde alle 8 Zeilen komplett durchlaufen werden, heißt <b>Bildwiederholrate</b> (in Hz). Unter etwa 50 Hz flimmert es deutlich, <b>ab etwa 100 Hz</b> wirkt das Bild ruhig.</p>`,
+        try: "Es beschleunigt von selbst – du kannst aber auch den Regler ziehen und den Punkt suchen, an dem das Flimmern verschwindet.",
+      },
+      {
+        title: "Helligkeit: PWM und Tastgrad",
+        say: `<p>Eine LED kennt nur <b>an</b> und <b>aus</b>. Wie bekommt man dann „halb hell“?</p>
+<p>Der Trick ist <b>schnelles Ein- und Ausschalten</b>: Man teilt eine Zeitspanne in 16 Felder, z. B. 12 Felder an, 4 Felder aus. Der Anteil 12 ÷ 16 = 75 % – schaltet man schnell genug, sieht das Auge 75 % Helligkeit.</p>
+<p>Dieser Einschaltanteil heißt <b>Tastgrad</b> (engl. duty cycle), das Verfahren <b>PWM</b> (Pulsweitenmodulation). Wichtig: Die Stromstärke bleibt immer gleich – nur die Dauer ändert sich.</p>`,
+        try: "Klicke verschiedene LEDs an und vergleiche, wie viele Felder sie leuchten. Langsam siehst du das Blinken; ziehst du den Regler nach rechts, wird daraus eine ruhige Helligkeit.",
+      },
+      {
+        title: "GCLK: das Metronom, das die Felder zählt",
+        say: `<p>Wer zählt die 16 Felder? Das ist der <b>GCLK</b> (Graustufentakt). Er ist wie ein <b>Metronom</b>: Bei jedem „Tick“ zählt ein Zähler im Treiber-IC um 1 weiter – 0, 1, 2 … 15, dann kommt die nächste Zeile.</p>
+<p>Jede Spalte merkt sich eine eigene Zahl, den <b>Graustufenwert</b> (0–15). Es gibt nur eine Regel: <b>Solange der Zähler kleiner als diese Zahl ist, leuchtet die LED; erreicht er sie, geht sie aus.</b> Je größer die Zahl, desto mehr Felder leuchten und desto heller ist die LED.</p>
+<p>Je schneller der GCLK, desto kürzer dauert eine Zeile – und desto <b>höher ist die Bildwiederholrate</b>.</p>`,
+        try: "Beobachte den Zähler unten: Sobald er den Graustufenwert der LED erreicht, geht sie aus. Klicke zum Vergleich andere LEDs derselben Zeile an.",
+      },
+      {
+        title: "Alles zusammen",
+        say: `<ol style="margin:0;padding-left:20px">
+<li>Der <b>MCU</b> schiebt die Graustufendaten jeder Zeile in den <b>Treiber-IC</b>;</li>
+<li>der <b>Decoder-IC</b> schaltet die Zeilen der Reihe nach ein – <b>Zeilen-Multiplexing</b>;</li>
+<li>während jeder Zeile gibt der <b>GCLK</b> 16 Takte vor, und der Treiber lässt jede Spalte so viele Takte leuchten, wie ihr Graustufenwert angibt – der <b>Tastgrad</b> bestimmt die Helligkeit;</li>
+<li>8 Zeilen ergeben ein Bild, und das viele Male pro Sekunde – ist die <b>Bildwiederholrate</b> hoch genug, sieht das Auge ein flimmerfreies Herz mit hellen und dunklen Stellen.</li></ol>`,
+        try: "Probier frei herum: Tempo ändern, LEDs anklicken, Werte ablesen. Das Timing-Diagramm für Profis findest du ganz unten unter „Für Fortgeschrittene“.",
+      },
+    ],
+    roRefresh: (hz) => `Wiederholrate ${hz} Hz`,
+    roLit: (r) => `Leuchtet: Zeile ${r}`,
+    roPowered: (r) => `Zeile ${r} hat Spannung`,
+    roSwitch: " · Wechsel",
+    roCount: (n) => ` · Zähler ${n}`,
+    slow: "langsam",
+    fast: "schnell",
+    speedScan: "Scan-Tempo",
+    speedSwitch: "Schalttempo",
+    addrLabel: "Nummer vom MCU:",
+    addrRes: (r) => `Zeile ${r} ein`,
+    colsLabel: (r) => `Daten für Zeile ${r}:`,
+    colName: (c) => `Sp.${c}`,
+    colsNote: (r, n) => `1 = Spalte an, 0 = Spalte aus. In Zeile ${r} leuchten also ${n} LEDs.`,
+    scanLabel: "Leuchtet gerade:",
+    scanFast: "zu schnell – Zeile nicht mehr erkennbar",
+    scanRow: (r) => `Zeile ${r}`,
+    refreshUnit: "Bildwiederholrate (Durchläufe pro Sekunde)",
+    verdict: ["sehr langsam: man sieht die Zeilen wandern", "flimmert", "flimmert leicht", "ruhig, kein Flimmern ✓"],
+    capZero: (r, c) => `Zeile ${r}, Spalte ${c}: Graustufenwert 0 – kein Feld leuchtet. Probier eine LED im Herz.`,
+    cap: (r, c, g, pct) => `Zeile ${r}, Spalte ${c}: Graustufenwert <b>${g}</b> → ${g} von 16 Feldern an → Tastgrad <b>${pct} %</b>`,
+    capSwitch: "　(Zeilenwechsel: Zähler auf 0)",
+    capCount: (n, g, on) => `　| Zähler ${n} ${on ? "&lt;" : "≥"} ${g} → LED ${on ? "<b>an</b>" : "aus"}`,
+    countLabel: "GCLK-Zähler",
+    countSwitch: "Wechsel",
+    refreshLabel: "Wiederholrate",
+    statF: "GCLK: jeder Takt zählt +1",
+    statScan: (rr) => `Multiplexing: Zeilenfrequenz ${rr}, jede Zeile 1/8 der Zeit`,
+    statRefresh: `Wiederholrate = GCLK ÷ (${RT}×8)`,
+    statDuty: (r, c, g) => `Gewählte LED (${r},${c}) GS=${g}: in der Zeile → mit Multiplexing`,
+    lanes: ["GCLK", "LE", "Zeile", "Zähler"],
+    busRow: (r, a) => `Zeile ${r} · A=${a}`,
+    busSwitch: "W",
+    scopeRo: (r) => `Zeile ${r} · 1 Feld = 1 GCLK`,
+  },
+};
+const LANGS = [["zh", "中文"], ["en", "EN"], ["de", "DE"]];
+let LANG = (() => {
+  try { const saved = localStorage.getItem("led-lang"); if (I18N[saved]) return saved; } catch {}
+  const nav = (navigator.language || "").toLowerCase();
+  return nav.startsWith("de") ? "de" : nav.startsWith("en") ? "en" : "zh";
+})();
+const TX = () => I18N[LANG];
+// ---------- 页面结构 ----------
+const EXTRA_CSS = `
+.iso{--led:#ff5a4f;--scope-hi:#e6e6e6;--accent-soft:#ff5a4f22}
+.iso[data-theme="light"]{--led:#e5372b;--scope-hi:#18181a;--accent-soft:#e5372b14}
+.sig{fill:none;stroke:var(--anatomy-lit);stroke-width:1.15;stroke-linecap:round;stroke-linejoin:round;opacity:0;vector-effect:non-scaling-stroke}
+.led-lens{fill:var(--led);stroke:none;opacity:0}
+.led-bloom{fill:var(--led);opacity:0;filter:blur(3.5px);pointer-events:none}
+.led-sel{fill:none;stroke:var(--anatomy-lit);stroke-width:1;opacity:0;vector-effect:non-scaling-stroke}
+.pick [data-led].on .led-sel{opacity:1}
+.led-hit{fill:transparent;stroke:none}
+.pick .led-hit{cursor:pointer}
+.bit{opacity:0;stroke-width:.7;vector-effect:non-scaling-stroke;fill:var(--anatomy-lit);stroke:var(--anatomy-lit)}
+.iso-svg>*{transition:opacity .5s var(--anatomy-ease)}
+.iso-svg>.dim{opacity:.16}
+.iso-stage{outline:none}
+.top-btns{position:fixed;top:14px;right:16px;display:flex;gap:8px;z-index:2}
+.top-btns button{font:11px var(--anatomy-mono);letter-spacing:.06em;background:var(--anatomy-card);color:var(--anatomy-text);border:1px solid var(--anatomy-lo);padding:6px 10px;cursor:pointer}
+.langs{display:flex}
+.langs button+button{border-left:none}
+.langs button[aria-pressed="true"]{background:var(--anatomy-strong);color:var(--anatomy-card);border-color:var(--anatomy-strong)}
+body:not([data-lang="zh"]) .lang-zh,body:not([data-lang="en"]) .lang-en,body:not([data-lang="de"]) .lang-de{display:none}
+body{margin:0;background:var(--anatomy-page);color:var(--anatomy-text);font:15px/1.7 ui-sans-serif,system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}
+.iso-page{width:min(760px,100% - 32px);margin:48px auto 80px}
+h1{font-size:22px;color:var(--anatomy-strong);font-weight:650;margin:0 0 4px}
+h2{font-size:16px;color:var(--anatomy-strong);font-weight:600;margin:32px 0 6px}
+.lede{margin:0 0 4px;color:var(--anatomy-text)}
+b,strong{color:var(--anatomy-strong);font-weight:600}
+code{font-family:var(--anatomy-mono);font-size:13px;color:var(--anatomy-strong)}
+.iso-figure{margin:16px 0 0}
+.iso-figure>.iso-plate{padding:34px 14px 30px}
+.iso-figure>.iso-plate .iso-plate-corners{inset:12px 14px}
+.guide{margin-top:12px;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-lo);padding:18px 20px 16px}
+.dots{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.dots button{font:11px/1 var(--anatomy-mono);color:var(--anatomy-muted);background:none;border:1px solid var(--anatomy-faint);padding:5px 8px;cursor:pointer}
+.dots button[aria-current="step"]{color:var(--anatomy-strong);border-color:var(--anatomy-hi)}
+.dots button.seen{color:var(--anatomy-text);border-color:var(--anatomy-lo)}
+.guide h3{margin:0;font-size:18px;color:var(--anatomy-strong);font-weight:650}
+.guide .kicker{font:11px var(--anatomy-mono);letter-spacing:.08em;color:var(--anatomy-muted)}
+.guide .say{margin:6px 0 0}
+.guide .say p{margin:0 0 8px}
+.guide .try{margin:6px 0 0;padding:8px 12px;background:var(--accent-soft);color:var(--anatomy-strong);font-size:14px}
+.helper:empty{display:none}
+.helper{margin-top:12px}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:14px;gap:12px}
+.nav button{font:14px ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif;padding:8px 18px;cursor:pointer;border:1px solid var(--anatomy-lo);background:var(--anatomy-card);color:var(--anatomy-text)}
+.nav button.primary{background:var(--anatomy-strong);color:var(--anatomy-card);border-color:var(--anatomy-strong)}
+.nav button:disabled{opacity:.35;cursor:default}
+.nav .count{font:12px var(--anatomy-mono);color:var(--anatomy-muted)}
+.speed{display:flex;align-items:center;gap:10px;font:12px var(--anatomy-mono);color:var(--anatomy-muted);margin-top:10px}
+.speed input{flex:1;accent-color:var(--led)}
+.big{display:flex;gap:10px 22px;flex-wrap:wrap;align-items:baseline}
+.big .n{font:600 26px/1.2 var(--anatomy-mono);color:var(--anatomy-strong);font-variant-numeric:tabular-nums}
+.big .u{font-size:13px;color:var(--anatomy-muted)}
+.verdict{display:inline-block;font-size:13px;padding:2px 10px;border:1px solid var(--anatomy-lo);color:var(--anatomy-text)}
+.verdict.ok{border-color:var(--led);color:var(--anatomy-strong)}
+.bitsbox{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.bitsbox .bitc{width:30px;height:34px;display:grid;place-items:center;font:600 18px var(--anatomy-mono);border:1px solid var(--anatomy-lo);color:var(--anatomy-muted)}
+.bitsbox .bitc.on{border-color:var(--anatomy-hi);color:var(--anatomy-card);background:var(--anatomy-strong)}
+.bitsbox .arrow{font-size:18px;color:var(--anatomy-muted);padding:0 4px}
+.bitsbox .res{font:600 18px var(--anatomy-mono);color:var(--anatomy-strong)}
+.bar{display:grid;grid-template-columns:repeat(16,1fr);gap:3px;margin:8px 0 4px}
+.bar span{height:26px;border:1px solid var(--anatomy-lo);font:10px var(--anatomy-mono);color:var(--anatomy-muted);display:grid;place-items:end center;padding-bottom:1px}
+.bar span.on{background:var(--led);border-color:var(--led);color:#fff}
+.bar span.now{outline:2px solid var(--anatomy-strong);outline-offset:1px}
+.barcap{font-size:13.5px;color:var(--anatomy-text)}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--anatomy-lo);box-shadow:0 0 0 1px var(--anatomy-lo);margin-top:10px}
+.stat{background:var(--anatomy-card);padding:10px 12px;min-width:0}
+.stat b{display:block;font:600 17px/1.3 var(--anatomy-mono);color:var(--anatomy-strong);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat>span{display:block;font-size:12px;color:var(--anatomy-muted);line-height:1.45;margin-top:2px}
+@media (max-width:620px){.stats{grid-template-columns:repeat(2,1fr)}.bar span{font-size:0}}
+.terms{width:100%;border-collapse:collapse;font-size:14px}
+.terms td{padding:9px 10px;border-top:1px solid var(--anatomy-faint);vertical-align:top}
+.terms td:first-child{white-space:nowrap;color:var(--anatomy-strong);font-weight:600;width:1%}
+details.adv{margin-top:28px;border-top:1px solid var(--anatomy-faint);padding-top:10px}
+details.adv summary{cursor:pointer;color:var(--anatomy-strong);font-weight:600}
+.scope-svg{display:block;width:100%;height:auto;font-family:var(--anatomy-mono)}
+.scope-svg .lane{fill:var(--anatomy-muted);font-size:10px}
+.scope-svg .note{fill:var(--anatomy-muted);font-size:9.5px}
+.scope-svg .note.sel{fill:var(--scope-hi)}
+.scope-svg .grid{stroke:var(--anatomy-faint);stroke-width:1}
+.scope-svg .wave{fill:none;stroke:var(--anatomy-mid);stroke-width:1.2;stroke-linejoin:round}
+.scope-svg .wave.sel{stroke:var(--scope-hi);stroke-width:1.6}
+.scope-svg .fillon{fill:var(--anatomy-mid);opacity:.12}
+.scope-svg .fillon.sel{fill:var(--led);opacity:.22}
+.scope-svg .bus{fill:none;stroke:var(--anatomy-mid);stroke-width:1}
+.scope-svg .cnt{fill:var(--anatomy-text);font-size:8.5px}
+.scope-svg .cursor{stroke:var(--led);stroke-width:1.4}
+.scope-svg .blank{fill:var(--anatomy-faint);opacity:.5}
+`;
+
+
+const plate1 = k.plateHtml({
+  fig: "Fig 1",
+  title: " ",
+  hint: " ",
+  readout: "",
+  body: `<div class="iso-stage" tabindex="-1">${svg}</div>`,
+}).replace("</div></figure>", `</div><section class="guide" aria-live="polite">
+<div class="dots"></div>
+<div class="kicker"></div><h3></h3><div class="say"></div><div class="helper"></div>
+<div class="nav"><button type="button" class="prev"></button><span class="count"></span><button type="button" class="next primary"></button></div>
+</section></figure>`);
+
+const plate2 = k.plateHtml({
+  fig: "Fig 2",
+  title: " ",
+  hint: " ",
+  readout: "",
+  caption: " ",
+  body: `<div class="scope"></div>`,
+});
+
+document.head.insertAdjacentHTML("beforeend", `<style>${k.ISO_CSS}${EXTRA_CSS}</style>`);
+const prefersLight = !matchMedia("(prefers-color-scheme: dark)").matches;
+document.body.className = "iso";
+document.body.dataset.theme = prefersLight ? "light" : "dark";
+document.body.innerHTML = `<div class="top-btns"><div class="langs" role="group" aria-label="Language">${LANGS.map(([code, name]) => `<button type="button" data-lang="${code}" lang="${I18N[code].htmlLang}">${name}</button>`).join("")}</div><button class="theme-btn" type="button">${prefersLight ? "DARK" : "LIGHT"}</button></div><main class="iso-page">
+<h1 data-i18n="h1"></h1>
+<p class="lede" data-i18n="lede"></p>
+${plate1}
+<h2 data-i18n="termsTitle"></h2>
+<table class="terms"></table>
+<details class="adv"><summary data-i18n="advSummary"></summary>
+${plate2}
+<p class="lede" data-i18n="advText"></p>
+</details>
+</main>`;
+
+// 把页面上的固定文字换成当前语言
+function applyStatic() {
+  const T = TX();
+  document.documentElement.lang = T.htmlLang;
+  document.title = T.docTitle;
+  document.body.dataset.lang = LANG;
+  document.querySelectorAll("[data-i18n]").forEach((el) => (el.innerHTML = T[el.dataset.i18n]));
+  document.querySelector(".terms").innerHTML = T.terms.map(([term, def]) => `<tr><td>${term}</td><td>${def}</td></tr>`).join("");
+  const [fig1, fig2] = document.querySelectorAll(".iso-figure");
+  fig1.querySelector('[data-corner="title"]').textContent = T.fig1Title;
+  fig1.querySelector('[data-corner="hint"]').textContent = T.fig1Hint;
+  fig2.querySelector('[data-corner="title"]').textContent = T.fig2Title;
+  fig2.querySelector('[data-corner="hint"]').textContent = T.fig2Hint;
+  fig2.querySelector(".iso-caption").textContent = T.fig2Caption;
+  document.querySelector(".guide .prev").textContent = T.prev;
+  document.querySelector(".guide .next").textContent = T.next;
+  document.querySelectorAll(".langs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
+}
+applyStatic();
+// ---------- 动起来：9 步导览（时间单位：GCLK 周期） ----------
+{
+  const FMIN = 2, FMAX = 40000;          // GCLK 频率范围 (Hz)
+  const TAU = 0.03;                      // LED + 人眼的余辉时间常数 (s)
+  const FRAME = 8 * RT;                  // 一帧的 GCLK 数
+  const stage = document.querySelector(".iso-stage");
+  const svgEl = stage.querySelector("svg");
+  const readout = document.querySelector("[data-readout]");
+  const readout2 = document.querySelectorAll("[data-readout]")[1];
+  const guide = document.querySelector(".guide");
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const still = matchMedia("(prefers-reduced-motion: reduce)");
+  const q = (sel) => [...stage.querySelectorAll(sel)];
+  const sig = {};
+  for (const el of q("[data-sig]")) (sig[el.dataset.sig] ||= []).push(el);
+  const lens = [], bloom = [], ledG = [];
+  for (const g of q("[data-led]")) {
+    const [r, c] = g.dataset.led.split("_").map(Number);
+    lens[r * 8 + c] = g.querySelector(".led-lens");
+    bloom[r * 8 + c] = g.querySelector(".led-bloom");
+    ledG[r * 8 + c] = g;
+  }
+  const bits = q(".bit");
+  const sdiPts = SDI.map(([x, y]) => at([x, y, 0]));
+  const seg = [0];
+  for (let i = 1; i < sdiPts.length; i++) seg.push(seg[i - 1] + Math.hypot(sdiPts[i][0] - sdiPts[i - 1][0], sdiPts[i][1] - sdiPts[i - 1][1]));
+  const along = (s) => {
+    const want = s * seg[seg.length - 1];
+    let i = 1;
+    while (i < seg.length - 1 && seg[i] < want) i++;
+    const t = (want - seg[i - 1]) / (seg[i] - seg[i - 1] || 1);
+    return [sdiPts[i - 1][0] + (sdiPts[i][0] - sdiPts[i - 1][0]) * t, sdiPts[i - 1][1] + (sdiPts[i][1] - sdiPts[i - 1][1]) * t];
+  };
+
+  // ---------- 导览脚本 ----------
+  // 每一步的行为；文字在 i18n.js 的 steps 里
+  const STEPS = [
+    { mode: { scan: "scan", pwm: true, cols: "pattern" }, f: 16000 },
+    { mode: { scan: "hold", only: true, pwm: false, cols: "pattern" }, f: 20, focus: ["led", "pmos", "r", "c", "k"], pick: true },
+    { mode: { scan: "scan", pwm: false, cols: "all" }, f: 10, focus: ["decoder", "mcu", "a", "g", "pmos", "r", "led"], helper: "addr" },
+    { mode: { scan: "hold", row: 4, pwm: false, cols: "pattern" }, f: 6, focus: ["driver", "mcu", "sdi", "clk", "le", "c", "k", "led", "r", "pmos"], helper: "cols" },
+    { mode: { scan: "scan", pwm: false, cols: "pattern" }, f: 17, helper: "scan" },
+    { mode: { scan: "scan", pwm: false, cols: "pattern" }, auto: [[0, 17], [3, 17], [13, 16000]], helper: "refresh", slider: true },
+    { mode: { scan: "hold", only: true, pwm: true, cols: "pattern" }, f: 5, focus: ["led", "driver", "pmos", "r", "c", "k"], pick: true, helper: "pwm", slider: true },
+    { mode: { scan: "hold", pwm: true, cols: "pattern", rowFromSel: true }, f: 3, focus: ["driver", "mcu", "gclk", "c", "k", "led", "r", "pmos"], pick: true, helper: "gclk", slider: true },
+    { mode: { scan: "scan", pwm: true, cols: "pattern" }, f: 16000, pick: true, helper: "free", slider: true },
+  ];
+
+  // ---------- 信号模型 ----------
+  let step = 0, mode = STEPS[0].mode;
+  let sel = { r: 2, c: 5 };
+  const keys = ["a0", "a1", "a2", "sdi", "clk", "le", "gclk"];
+  for (let r = 0; r < 8; r++) keys.push("g" + r, "r" + r);
+  for (let c = 0; c < 8; c++) keys.push("c" + c);
+  const ch = Object.fromEntries(keys.map((key) => [key, 0]));
+  const ledB = new Float32Array(64);
+  const acc = {}, ledAcc = new Float32Array(64);
+  const mod8 = (v) => ((v % 8) + 8) % 8;
+  const rowAt = (abs) => (mode.scan === "scan" ? mod8(abs) : mode.only || mode.rowFromSel ? sel.r : mode.row);
+
+  function levels(p, out, ledOut) {
+    const abs = Math.floor(p / RT), tt = p - abs * RT, tick = Math.floor(tt), ph = tt - tick;
+    const row = rowAt(abs);
+    out.gclk += ph < 0.5 ? 1 : 0;
+    out.a0 += row & 1; out.a1 += (row >> 1) & 1; out.a2 += (row >> 2) & 1;
+    out["g" + row] += 1; out["r" + row] += 1;
+    if (mode.scan === "scan" && tick === 0 && ph < 0.5) out.le += 1;
+    if (mode.cols === "pattern") for (let b = 0; b < 8; b++) {
+      const t = shiftAt(b);
+      if (tt > t - TRAVEL && tt < t) out.sdi += 1 / 8;
+      if (tt >= t && tt < t + 0.4) out.clk += 1;
+    }
+    for (let c = 0; c < 8; c++) {
+      if (mode.only && c !== sel.c) continue;
+      let on;
+      if (mode.cols === "all") on = mode.scan !== "scan" || tick >= 1;
+      else if (mode.pwm) on = tick >= 1 && tick - 1 < GS[row][c];
+      else if (mode.only) on = true;
+      else on = (mode.scan !== "scan" || tick >= 1) && GS[row][c] > 0;
+      if (on) { out["c" + c] += 1; ledOut[row * 8 + c] += 1; }
+    }
+  }
+  // 当前模式下一颗灯可能的最大平均占空比，用来把亮度归一到 0–1
+  const maxDuty = () => (mode.scan === "scan" ? 1 / 8 : 1) * (mode.pwm ? 15 / RT : mode.scan === "scan" ? LEVELS / RT : 1);
+
+  let lf = Math.log(16000), target = 16000, phase = RT * 3.5, clock = 0, touring = false, last = 0, frame = 0, visible = false;
+  const ease = (t) => t * t * (3 - 2 * t);
+  const pathAt = (path, t) => {
+    for (let i = 1; i < path.length; i++) if (t <= path[i][0]) {
+      const [t0, v0] = path[i - 1], [t1, v1] = path[i];
+      return Math.exp(Math.log(v0) + (Math.log(v1) - Math.log(v0)) * ease((t - t0) / (t1 - t0 || 1)));
+    }
+    return path[path.length - 1][1];
+  };
+  const toShare = (f) => (Math.log(f) - Math.log(FMIN)) / (Math.log(FMAX) - Math.log(FMIN));
+  const fromShare = (s) => Math.exp(Math.log(FMIN) + Math.min(1, Math.max(0, s)) * (Math.log(FMAX) - Math.log(FMIN)));
+
+  function integrate(dt) {
+    let span = Math.exp(lf) * dt;
+    if (span > FRAME) span = FRAME;       // 信号以一帧为周期，超过一帧时取一帧的平均
+    for (const key of keys) acc[key] = 0;
+    ledAcc.fill(0);
+    const n = Math.min(1100, Math.ceil(span * 4) + 2);
+    for (let i = 0; i < n; i++) levels(phase - span + (span * (i + 0.5)) / n, acc, ledAcc);
+    const a = 1 - Math.exp(-dt / TAU);
+    for (const key of keys) ch[key] += (acc[key] / n - ch[key]) * a;
+    for (let i = 0; i < 64; i++) ledB[i] += (ledAcc[i] / n - ledB[i]) * a;
+  }
+
+  // ---------- 辅助小组件 ----------
+  const helper = $(".helper", guide);
+  const fmtHz = (f) => (f >= 1000 ? `${(f / 1000).toFixed(f >= 10000 ? 1 : 2)} kHz` : f >= 10 ? `${Math.round(f)} Hz` : `${f.toFixed(1)} Hz`);
+  const bar = () => `<div class="bar">${Array.from({ length: LEVELS }, (_, i) => `<span>${i}</span>`).join("")}</div><div class="barcap"></div>`;
+  const slider = (label) => `<label class="speed">${label} · ${TX().slow}<input type="range" min="0" max="1000" value="0" aria-label="${label}">${TX().fast}</label>`;
+  const small = `style="font:11px var(--anatomy-mono);text-align:center;color:var(--anatomy-muted)"`;
+  const HELPERS = {
+    addr: (T) => `<div class="bitsbox"><span>${T.addrLabel}</span>${["A2", "A1", "A0"].map((n) => `<div><div class="bitc" data-b="${n}">0</div><div ${small}>${n}</div></div>`).join("")}<span class="arrow">→</span><span class="res"></span></div>`,
+    cols: (T) => `<div class="bitsbox"><span>${T.colsLabel(4)}</span>${Array.from({ length: 8 }, (_, c) => `<div><div class="bitc${GS[4][c] ? " on" : ""}">${GS[4][c] ? 1 : 0}</div><div ${small}>${T.colName(c)}</div></div>`).join("")}</div><p class="barcap" style="margin:6px 0 0">${T.colsNote(4, GS[4].filter(Boolean).length)}</p>`,
+    scan: (T) => `<div class="bitsbox"><span>${T.scanLabel}</span>${Array.from({ length: 8 }, (_, r) => `<div class="bitc" data-row="${r}">${r}</div>`).join("")}<span class="res"></span></div>`,
+    refresh: (T) => `<div class="big"><div><span class="n" data-h="refresh">—</span> <span class="u">${T.refreshUnit}</span></div><span class="verdict" data-h="verdict"></span></div>${slider(T.speedScan)}`,
+    pwm: (T) => `${bar()}${slider(T.speedSwitch)}`,
+    gclk: (T) => `<div class="big"><div><span class="u">${T.countLabel}</span> <span class="n" data-h="count">0</span></div><div><span class="u">GCLK</span> <span class="n" style="font-size:18px" data-h="f">—</span></div><div><span class="u">${T.refreshLabel}</span> <span class="n" style="font-size:18px" data-h="refresh">—</span></div></div>${bar()}${slider("GCLK")}`,
+    free: (T) => `${slider("GCLK")}<div class="stats">
+<div class="stat"><b data-h="f">—</b><span>${T.statF}</span></div>
+<div class="stat"><b>1/8</b><span data-h="rowrate"></span></div>
+<div class="stat"><b data-h="refresh">—</b><span>${T.statRefresh}</span></div>
+<div class="stat"><b data-h="duty">—</b><span data-h="which"></span></div></div>`,
+  };
+  const H = (name) => helper.querySelector(`[data-h="${name}"]`);
+
+  function updateHelper(row, tt, fast) {
+    const f = Math.exp(lf), refresh = f / FRAME, kind = STEPS[step].helper;
+    const tick = Math.floor(tt), count = tick - 1, T = TX();
+    if (kind === "addr") {
+      const b = [(row >> 2) & 1, (row >> 1) & 1, row & 1];
+      helper.querySelectorAll("[data-b]").forEach((el, i) => { el.textContent = b[i]; el.classList.toggle("on", !!b[i]); });
+      $(".res", helper).textContent = T.addrRes(row);
+    } else if (kind === "scan") {
+      helper.querySelectorAll("[data-row]").forEach((el) => el.classList.toggle("on", Number(el.dataset.row) === row));
+      $(".res", helper).textContent = fast ? T.scanFast : T.scanRow(row);
+    } else if (kind === "refresh") {
+      H("refresh").textContent = `${refresh < 10 ? refresh.toFixed(1) : Math.round(refresh)} Hz`;
+      const v = H("verdict");
+      const text = T.verdict[refresh < 3 ? 0 : refresh < 50 ? 1 : refresh < 100 ? 2 : 3];
+      if (v.textContent !== text) { v.textContent = text; v.classList.toggle("ok", refresh >= 100); }
+    }
+    if (kind === "pwm" || kind === "gclk") {
+      const g = GS[sel.r][sel.c];
+      const showNow = !fast && tick >= 1;
+      helper.querySelectorAll(".bar span").forEach((el, i) => { el.classList.toggle("on", i < g); el.classList.toggle("now", showNow && i === count); });
+      let cap = g === 0 ? T.capZero(sel.r, sel.c) : T.cap(sel.r, sel.c, g, Math.round((g / LEVELS) * 100));
+      if (kind === "gclk" && !fast) cap += tick === 0 ? T.capSwitch : T.capCount(count, g, count < g);
+      const capEl = $(".barcap", helper);
+      if (capEl.innerHTML !== cap) capEl.innerHTML = cap;
+      if (kind === "gclk") {
+        H("count").textContent = fast ? "…" : tick === 0 ? T.countSwitch : String(count);
+        H("f").textContent = fmtHz(f);
+        H("refresh").textContent = `${refresh < 10 ? refresh.toFixed(2) : Math.round(refresh)} Hz`;
+      }
+    } else if (kind === "free") {
+      const g = GS[sel.r][sel.c];
+      H("f").textContent = fmtHz(f);
+      H("rowrate").textContent = T.statScan(fmtHz(f / RT));
+      H("refresh").textContent = `${refresh < 10 ? refresh.toFixed(2) : Math.round(refresh)} Hz`;
+      H("duty").textContent = `${Math.round((g / LEVELS) * 100)}% → ${((g / RT / 8) * 100).toFixed(1)}%`;
+      H("which").textContent = T.statDuty(sel.r, sel.c, g);
+    }
+    const range = $(".speed input", helper);
+    if (range && document.activeElement !== range) range.value = String(Math.round(toShare(f) * 1000));
+  }
+
+  // ---------- Fig 2 时序图（进阶） ----------
+  const SW = 640, X0 = 66, X1 = 540, LANE = 21, TOP = 8;
+  const CELLS = RT + 1, CW = (X1 - X0) / CELLS;
+  const laneNames = () => [...TX().lanes, ...Array.from({ length: 8 }, (_, c) => `OUT${c}`)];
+  const SH = TOP + 12 * LANE + 10;
+  const xOf = (t) => X0 + t * CW;
+  const yOf = (i) => TOP + i * LANE;
+  const scope = $(".scope");
+  scope.innerHTML = `<svg class="scope-svg" viewBox="0 0 ${SW} ${SH}" role="img" aria-label="GCLK / LE / OUT timing"><g class="scope-static"></g><line class="cursor" x1="0" x2="0" y1="${TOP - 2}" y2="${SH - 6}"/></svg>`;
+  const scopeStatic = $(".scope-static", scope);
+  const cursor = $(".cursor", scope);
+  const hi = (i) => yOf(i) + 4, lo = (i) => yOf(i) + LANE - 5;
+  const busBox = (i, t0, t1, text) => {
+    const a = xOf(t0), b = xOf(t1), y0 = hi(i), y1 = lo(i), m = (y0 + y1) / 2, e = Math.min(3, (b - a) / 3);
+    return `<path class="bus" d="M${a} ${m}L${a + e} ${y0}H${b - e}L${b} ${m}L${b - e} ${y1}H${a + e}Z"/><text class="cnt" x="${(a + b) / 2}" y="${m + 3}" text-anchor="middle">${text}</text>`;
+  };
+  let drawnKey = "";
+  function buildScope(R) {
+    const key = `${R}|${sel.r}|${sel.c}|${LANG}`;
+    const T = TX();
+    if (key === drawnKey) return;
+    drawnKey = key;
+    const out = [];
+    for (let t = 0; t <= CELLS; t++) out.push(`<line class="grid" x1="${xOf(t)}" x2="${xOf(t)}" y1="${TOP}" y2="${SH - 8}"/>`);
+    out.push(`<rect class="blank" x="${xOf(0)}" y="${TOP}" width="${CW}" height="${SH - 8 - TOP}"/><rect class="blank" x="${xOf(RT)}" y="${TOP}" width="${CW}" height="${SH - 8 - TOP}"/>`);
+    laneNames().forEach((name, i) => out.push(`<text class="lane" x="6" y="${yOf(i) + LANE / 2 + 4}">${name}</text>`));
+    let d = `M${xOf(0)} ${lo(0)}`;
+    for (let t = 0; t < CELLS; t++) d += `V${hi(0)}H${xOf(t + 0.5)}V${lo(0)}H${xOf(t + 1)}`;
+    out.push(`<path class="wave" d="${d}"/>`);
+    const pulse = (t) => `H${xOf(t)}V${hi(1)}H${xOf(t + 0.5)}V${lo(1)}`;
+    out.push(`<path class="wave" d="M${xOf(0)} ${lo(1)}${pulse(0)}${pulse(RT)}H${xOf(CELLS)}"/>`);
+    const addr = (r) => r.toString(2).padStart(3, "0");
+    out.push(busBox(2, 0, RT, T.busRow(R, addr(R))), busBox(2, RT, CELLS, `${(R + 1) % 8}`));
+    out.push(busBox(3, 0, 1, T.busSwitch), busBox(3, RT, CELLS, T.busSwitch));
+    for (let n = 0; n < LEVELS; n++) out.push(busBox(3, n + 1, n + 2, String(n)));
+    for (let c = 0; c < 8; c++) {
+      const i = 4 + c, g = GS[R][c], on = R === sel.r && c === sel.c ? " sel" : "";
+      const a = xOf(1), b = xOf(1 + g);
+      out.push(g ? `<rect class="fillon${on}" x="${a}" y="${hi(i)}" width="${b - a}" height="${lo(i) - hi(i)}"/>` : "");
+      out.push(`<path class="wave${on}" d="M${xOf(0)} ${lo(i)}${g ? `H${a}V${hi(i)}H${b}V${lo(i)}` : ""}H${xOf(CELLS)}"/>`);
+      out.push(`<text class="note${on}" x="${X1 + 8}" y="${yOf(i) + LANE / 2 + 4}">GS ${String(g).padStart(2, " ")} · ${Math.round((g / LEVELS) * 100)}%</text>`);
+    }
+    scopeStatic.innerHTML = out.join("");
+    readout2.textContent = T.scopeRo(R);
+  }
+
+  // ---------- 每帧绘制 ----------
+  const fmt = (v) => v.toFixed(2);
+  function draw() {
+    const f = Math.exp(lf), rowRate = f / RT, refresh = f / FRAME;
+    const abs = Math.floor(phase / RT), row = rowAt(abs), tt = phase - abs * RT, tick = Math.floor(tt);
+    const fast = rowRate > 12;
+    const scanning = mode.scan === "scan";
+    const set = (key, v) => (sig[key] || []).forEach((el) => (el.style.opacity = fmt(Math.min(1, v))));
+    const gain = 0.95 / maxDuty();
+    for (const b of ["a0", "a1", "a2"]) set(b, ch[b]);
+    for (let r = 0; r < 8; r++) { set("g" + r, ch["g" + r] * (scanning && fast ? 6 : 1)); set("r" + r, ch["r" + r] * (scanning && fast ? 6 : 1)); }
+    for (let c = 0; c < 8; c++) {
+      const cg = fast ? Math.min(6, gain * 0.25) : 1;
+      set(`c${c}t`, ch["c" + c] * cg);
+      set(`c${c}b`, ch["c" + c] * cg);
+      for (let r = 0; r < 8; r++) set(`k${r}_${c}`, ledB[r * 8 + c] * gain);
+    }
+    const dataOn = mode.cols === "pattern";
+    set("sdi", dataOn ? (fast ? 0.3 + ch.sdi : 0.15 + ch.sdi) : 0);
+    set("clk", dataOn ? ch.clk * (fast ? 3 : 1) : 0);
+    set("le", ch.le * (fast ? 10 : 1));
+    set("gclk", mode.pwm ? (fast ? 0.9 : 0.2 + ch.gclk * 0.8) : 0);
+    for (let i = 0; i < 64; i++) {
+      const v = Math.min(1, ledB[i] * gain);
+      lens[i].style.opacity = fmt(v);
+      bloom[i].style.opacity = fmt(v * 0.55);
+    }
+    const next = scanning ? (row + 1) % 8 : row;
+    const show = dataOn ? Math.max(0, Math.min(1, (14 - rowRate) / 8)) : 0;
+    bits.forEach((el, b) => {
+      const t = shiftAt(b), s = (tt - (t - TRAVEL)) / TRAVEL;
+      if (show <= 0 || s <= 0 || s >= 1) { el.style.opacity = "0"; return; }
+      const [x, y] = along(s);
+      const g = GS[next][7 - b];
+      el.setAttribute("cx", x.toFixed(1));
+      el.setAttribute("cy", y.toFixed(1));
+      el.style.fillOpacity = g ? fmt(mode.pwm ? 0.25 + (0.75 * g) / 15 : 1) : "0";
+      el.style.opacity = fmt(show * Math.min(1, s * 6, (1 - s) * 6));
+    });
+    const T = TX();
+    let text;
+    if (scanning && fast) text = T.roRefresh(Math.round(refresh));
+    else if (scanning) text = T.roLit(row);
+    else text = T.roPowered(row);
+    if (mode.pwm && !fast) text += tick === 0 ? T.roSwitch : T.roCount(tick - 1);
+    if (readout.textContent !== text) readout.textContent = text;
+    updateHelper(row, tt, fast);
+    if (scope.closest("details").open) {
+      buildScope(fast || !scanning ? sel.r : row);
+      cursor.style.opacity = fast ? "0" : "1";
+      if (!fast) { const x = xOf(tt).toFixed(1); cursor.setAttribute("x1", x); cursor.setAttribute("x2", x); }
+    }
+  }
+
+  function tick() {
+    const now = performance.now();
+    const dt = last ? Math.min((now - last) / 1000, 0.25) : 1 / 60;  // 按真实时间推进，掉帧时也不会变慢
+    last = now;
+    const auto = STEPS[step].auto;
+    if (touring && auto) { clock += dt; target = pathAt(auto, clock); }
+    lf += (Math.log(target) - lf) * (1 - Math.exp(-dt / 0.35));
+    phase += Math.exp(lf) * dt;
+    if (phase > FRAME * 1e6) phase -= FRAME * 1e6;
+    integrate(dt);
+    draw();
+    frame = visible ? requestAnimationFrame(tick) : 0;
+  }
+  const run = () => { if (!frame && visible && !still.matches) { last = 0; frame = requestAnimationFrame(tick); } };
+
+  // ---------- 导览控制 ----------
+  const dots = $(".dots", guide);
+  dots.innerHTML = STEPS.map((_, i) => `<button type="button" data-step="${i}">${i + 1}</button>`).join("");
+  const seen = new Set();
+  const focusMatch = (el, focus) => {
+    if (el.classList.contains("sigs") || el.classList.contains("bits")) return true;
+    if (el.dataset.part) return focus.includes(el.dataset.part);
+    if (el.hasAttribute("data-led")) return focus.includes("led");
+    if (el.dataset.t !== undefined) {
+      const id = el.dataset.t;
+      if (!id) return false;
+      return focus.some((f) => (f.length === 1 ? new RegExp(`^${f}\\d`).test(id) : id === f));
+    }
+    return true; // 电路板本身
+  };
+  function select(r, c) {
+    ledG[sel.r * 8 + sel.c].classList.remove("on");
+    sel = { r, c };
+    ledG[r * 8 + c].classList.add("on");
+  }
+  // 只换当前步骤的文字和小组件，不动速度（切换语言时也用它）
+  function renderStep() {
+    const s = STEPS[step], T = TX(), txt = T.steps[step];
+    $(".kicker", guide).textContent = T.kicker(step + 1, STEPS.length);
+    $("h3", guide).textContent = txt.title;
+    $(".say", guide).innerHTML = txt.say + (txt.try ? `<p class="try">${txt.try}</p>` : "");
+    helper.innerHTML = s.helper ? HELPERS[s.helper](T) : "";
+    dots.querySelectorAll("button").forEach((b, j) => (b.title = T.steps[j].title));
+    const range = $(".speed input", helper);
+    if (range) range.addEventListener("input", () => { touring = false; target = fromShare(range.value / 1000); });
+  }
+  function go(i) {
+    step = Math.max(0, Math.min(STEPS.length - 1, i));
+    const s = STEPS[step];
+    seen.add(step);
+    mode = s.mode;
+    renderStep();
+    $(".count", guide).textContent = `${step + 1} / ${STEPS.length}`;
+    $(".prev", guide).disabled = step === 0;
+    $(".next", guide).disabled = step === STEPS.length - 1;
+    dots.querySelectorAll("button").forEach((b, j) => { b.toggleAttribute("aria-current", j === step); if (j === step) b.setAttribute("aria-current", "step"); b.classList.toggle("seen", seen.has(j)); });
+    stage.classList.toggle("pick", !!s.pick);
+    for (const el of svgEl.children) el.classList.toggle("dim", !!s.focus && !focusMatch(el, s.focus));
+    // 速度：一进入就到位（自动加速的步骤从起点开始）
+    touring = !!s.auto;
+    clock = 0;
+    target = s.auto ? s.auto[0][1] : s.f;
+    lf = Math.log(target);
+    phase = s.auto ? RT * 0.5 : phase;
+    if (still.matches) { lf = Math.log(16000); integrate(1); draw(); }
+    run();
+  }
+  dots.addEventListener("click", (e) => { const b = e.target.closest("[data-step]"); if (b) go(Number(b.dataset.step)); });
+  $(".prev", guide).addEventListener("click", () => go(step - 1));
+  $(".next", guide).addEventListener("click", () => go(step + 1));
+  stage.addEventListener("click", (ev) => {
+    if (!STEPS[step].pick) return;
+    const g = ev.target.closest("[data-led]");
+    if (!g) return;
+    const [r, c] = g.dataset.led.split("_").map(Number);
+    select(r, c);
+  });
+  document.addEventListener("keydown", (ev) => {
+    if (ev.target.closest && ev.target.closest("input")) return;
+    if (ev.key === "ArrowRight") go(step + 1);
+    if (ev.key === "ArrowLeft") go(step - 1);
+  });
+  new IntersectionObserver((e) => { visible = e[e.length - 1].isIntersecting; if (visible) run(); }, { rootMargin: "100px 0px" }).observe(stage);
+  $("details.adv").addEventListener("toggle", () => { drawnKey = ""; });
+  select(sel.r, sel.c);
+  go(0);
+  // 右上角切换语言：保留当前步骤和速度，只换文字
+  $(".langs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-lang]");
+    if (!b || b.dataset.lang === LANG) return;
+    LANG = b.dataset.lang;
+    try { localStorage.setItem("led-lang", LANG); } catch {}
+    applyStatic();
+    renderStep();
+    drawnKey = "";
+    draw();
+  });
+  const btn = $(".theme-btn");
+  btn.addEventListener("click", () => {
+    const light = document.body.dataset.theme !== "light";
+    document.body.dataset.theme = light ? "light" : "dark";
+    btn.textContent = light ? "DARK" : "LIGHT";
+  });
+}
+
+</script></body></html>
