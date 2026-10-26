@@ -954,6 +954,8 @@ const I18N = {
     switchLabel: "Auf Deutsch umschalten",
     docTitle: "LED 屏是怎么亮起来的？",
     h1: "LED 屏是怎么亮起来的？",
+    navIcs: "驱动 IC 资料库 →",
+    ctaIcs: "<b>想看我们产品里具体用的是哪颗芯片？</b> 打开驱动 IC 资料库：每颗芯片都有 3D 模型、工作原理和优势分析 →",
     lede: "零基础也能看懂：跟着下面 9 步，认识 LED 屏里的两颗关键芯片——<b>译码 IC</b> 和 <b>LED 驱动 IC</b>。每一步只讲一件事，图上会把相关部分高亮。",
     fig1Title: "LED 点阵板",
     fig1Hint: "按“下一步”跟着看",
@@ -1080,6 +1082,8 @@ const I18N = {
     htmlLang: "en",
     docTitle: "How does an LED display light up?",
     h1: "How does an LED display light up?",
+    navIcs: "Driver IC library →",
+    ctaIcs: "<b>Which chips do our products actually use?</b> Open the driver IC library – every chip with a 3D model, how it works and its strengths →",
     lede: "No background needed: in 9 steps you'll meet the two key chips inside an LED display – the <b>decoder IC</b> and the <b>LED driver IC</b>. Each step explains one thing, and the board highlights the parts that matter.",
     fig1Title: "LED matrix board",
     fig1Hint: "Click “Next” to follow along",
@@ -1205,6 +1209,8 @@ const I18N = {
     switchLabel: "切换到中文",
     docTitle: "Wie leuchtet ein LED-Display?",
     h1: "Wie leuchtet ein LED-Display?",
+    navIcs: "Treiber-IC-Bibliothek →",
+    ctaIcs: "<b>Welche Chips stecken in unseren Produkten?</b> Zur Treiber-IC-Bibliothek – jeder Chip mit 3D-Modell, Funktionsweise und Stärken →",
     lede: "Ganz ohne Vorkenntnisse: In 9 Schritten lernst du die zwei wichtigsten Chips in einem LED-Display kennen – den <b>Decoder-IC</b> und den <b>LED-Treiber-IC</b>. Jeder Schritt erklärt genau eine Sache, und auf der Platine wird hervorgehoben, worum es gerade geht.",
     fig1Title: "LED-Matrix-Platine",
     fig1Hint: "Mit „Weiter“ durchklicken",
@@ -1347,6 +1353,11 @@ const EXTRA_CSS = `
 .iso-svg>.dim{opacity:.16}
 .iso-stage{outline:none}
 .top-btns{position:fixed;top:14px;right:16px;display:flex;gap:8px;z-index:2}
+.ic-link{position:fixed;top:14px;left:16px;z-index:2;font:11px var(--anatomy-mono);letter-spacing:.06em;background:var(--anatomy-card);color:var(--anatomy-text);border:1px solid var(--anatomy-lo);padding:6px 10px;text-decoration:none}
+.ic-cta{display:block;margin:14px 0 4px;padding:12px 16px;background:var(--anatomy-card);box-shadow:0 0 0 1px var(--anatomy-lo);color:var(--anatomy-text);text-decoration:none;font-size:14.5px;transition:box-shadow .2s}
+.ic-cta:hover{box-shadow:0 0 0 1px var(--anatomy-hi)}
+.ic-cta b{color:var(--anatomy-strong)}
+@media (max-width:560px){.ic-link{display:none}}
 .top-btns button{font:11px var(--anatomy-mono);letter-spacing:.06em;background:var(--anatomy-card);color:var(--anatomy-text);border:1px solid var(--anatomy-lo);padding:6px 10px;cursor:pointer}
 .langs{display:flex}
 .langs button+button{border-left:none}
@@ -1444,12 +1455,15 @@ const plate2 = k.plateHtml({
 });
 
 document.head.insertAdjacentHTML("beforeend", `<style>${k.ISO_CSS}${EXTRA_CSS}</style>`);
-const prefersLight = !matchMedia("(prefers-color-scheme: dark)").matches;
+const savedTheme = (() => { try { return localStorage.getItem("led-theme"); } catch { return null; } })(); // 与 IC 页面共用
+const prefersLight = savedTheme ? savedTheme === "light" : !matchMedia("(prefers-color-scheme: dark)").matches;
 document.body.className = "iso";
 document.body.dataset.theme = prefersLight ? "light" : "dark";
 document.body.innerHTML = `<div class="top-btns"><div class="langs" role="group" aria-label="Language">${LANGS.map(([code, name]) => `<button type="button" data-lang="${code}" lang="${I18N[code].htmlLang}">${name}</button>`).join("")}</div><button class="theme-btn" type="button">${prefersLight ? "DARK" : "LIGHT"}</button></div><main class="iso-page">
+<a class="ic-link" href="ics.html" data-i18n="navIcs"></a>
 <h1 data-i18n="h1"></h1>
 <p class="lede" data-i18n="lede"></p>
+<a class="ic-cta" href="ics.html" data-i18n="ctaIcs"></a>
 ${plate1}
 <h2 data-i18n="termsTitle"></h2>
 <table class="terms"></table>
@@ -1851,6 +1865,7 @@ applyStatic();
     const light = document.body.dataset.theme !== "light";
     document.body.dataset.theme = light ? "light" : "dark";
     btn.textContent = light ? "DARK" : "LIGHT";
+    try { localStorage.setItem("led-theme", light ? "light" : "dark"); } catch {} // 与 IC 页面共用
   });
 }
 
