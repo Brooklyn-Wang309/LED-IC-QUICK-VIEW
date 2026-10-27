@@ -152,6 +152,10 @@ table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(-
 .cmp h3{font-size:14px;margin-bottom:6px}
 @media (max-width:820px){.concepts{grid-template-columns:1fr}}
 
+.pk-link{display:block;margin:14px 0 0;padding:12px 16px;background:var(--card);box-shadow:var(--shadow);color:var(--text);text-decoration:none;font-size:14.5px}
+.pk-link:hover{box-shadow:0 0 0 1px var(--strong)}
+.two:has(.calc.hidden){grid-template-columns:1fr}
+
 </style>
 </head>
 <body>
@@ -183,6 +187,7 @@ table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(-
     <div class="tip"></div>
   </div>
   <p class="note3d" data-i18n="note_3d"></p>
+  <a class="pk-link" href="packages.html" data-i18n="pk_link"></a>
 
   <h2 data-i18n="h_app"></h2>
   <div class="two">
@@ -234,7 +239,7 @@ table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(-
 <script>
 const IC_ALL = [];
 const registerIC = (ic) => IC_ALL.push(ic);
-const IC_INDEX = [{"id": "ICND2055S", "products": ["AVORA", "MERI"], "maker": "Chipone", "drive": "sink"}, {"id": "ICND2069", "products": ["Jupiter", "VENUS"], "maker": "Chipone", "drive": "source"}, {"id": "ICND2169", "products": ["ARUNA"], "maker": "Chipone", "drive": "source"}, {"id": "CFD955B", "products": ["AURA"], "maker": "Chipfountain", "drive": "source"}, {"id": "MBI5264", "products": ["LUGH"], "maker": "Macroblock", "drive": "sink"}, {"id": "XM10480G", "products": ["LEDGend", "ENKI"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "XM11206G", "products": ["WINGSTER"], "maker": "Xm-Plus", "drive": "integrated"}];
+const IC_INDEX = [{"id": "ICND2055S", "products": ["AVORA", "MERI"], "maker": "Chipone", "drive": "sink"}, {"id": "ICND2069", "products": ["Jupiter", "VENUS"], "maker": "Chipone", "drive": "source"}, {"id": "ICND2169", "products": ["ARUNA"], "maker": "Chipone", "drive": "source"}, {"id": "CFD955B", "products": ["AURA"], "maker": "Chipfountain", "drive": "source"}, {"id": "MBI5264", "products": ["LUGH"], "maker": "Macroblock", "drive": "sink"}, {"id": "XM10480G", "products": ["LEDGend", "ENKI"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "XM11206G", "products": ["WINGSTER"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "TBS5267A", "products": [{"zh": "FOLDSTER 户外 P1.8", "en": "FOLDSTER outdoor P1.8", "de": "FOLDSTER Outdoor P1.8"}], "maker": "TBSILICON", "drive": "source"}, {"id": "DP3370S", "products": [{"zh": "FOLDSTER 户内 P1.5", "en": "FOLDSTER indoor P1.5", "de": "FOLDSTER Indoor P1.5"}], "maker": "Depu Micro", "drive": "sink"}, {"id": "ICND1065L", "products": [{"zh": "FOLDSTER 户内 P1.8", "en": "FOLDSTER indoor P1.8", "de": "FOLDSTER Indoor P1.8"}], "maker": "Chipone", "drive": "sink"}];
 // ---------- Xm-Plus 资料里的公共数据（Xm-Plus Product Introduction, Jun 2024） ----------
 // GEN2 刷新率配置表
 const XM_REFRESH_TABLE = [
@@ -387,7 +392,8 @@ registerIC({
 // 每个 IC 页面先 registerIC(...)，再加载本文件。IC 是当前页面的芯片（总览页为 null）。
 const COMMON = {
 zh: {
-  back: "← 全部驱动 IC", doc_suffix: "LED 驱动 IC", used_in: "用于", others: "其他驱动 IC",
+  back: "← 全部驱动 IC", doc_suffix: "LED 驱动 IC",
+  pk_link: "<b>封装对比</b>：SSOP、QFN、BGA 有什么不同？哪种好修、哪种散热好 →", used_in: "用于", others: "其他驱动 IC",
   f_ch: "通道", f_scan: "扫描", f_cur: "单路电流", f_acc: "电流精度", f_pkg: "封装", f_drive: "驱动方式", f_gray: "灰度", f_refresh: "刷新率",
   h_3d: "拿在手里看一看",
   p_3d: "拖动旋转、滚轮缩放，鼠标移到引脚或器件上可以看到它的作用。打开“透视内部”能看到芯片里的硅片和金线。<b>橙色光点</b>是流过 LED 的电流，<b>蓝色光点</b>是数据。",
@@ -399,7 +405,7 @@ zh: {
   leg_dat: "数据：串行数据和时钟",
   pin: "引脚",
   pin_GND: "地：电流从这里流出芯片", pin_SDI: "串行数据输入：灰度数据一位一位送进来", pin_SIN: "串行数据输入：灰度数据一位一位送进来", pin_DIN: "串行数据输入：灰度数据一位一位送进来",
-  pin_DCLK: "数据时钟：每个时钟边沿移入一位数据", pin_LE: "锁存 / 命令：高电平期间数几个时钟，就是哪条命令", pin_LATCH: "锁存 / 命令：用脉冲长度区分不同命令",
+  pin_DCLK: "数据时钟：每个时钟边沿移入一位数据", pin_LE: "锁存 / 命令：高电平期间数几个时钟，就是哪条命令", pin_LATCH: "锁存 / 命令：用脉冲长度区分不同命令", pin_LAT: "锁存 / 命令：LAT 的长度不同，代表不同的命令",
   pin_OUT_sink: "恒流输出：吸入一列 LED 的电流（灌电流）", pin_OUT_source: "恒流输出：向一列 LED 送出电流（拉电流）",
   pin_ROW: "换行信号：告诉芯片换到下一行", pin_ST: "换行信号（Scan toggle）：告诉芯片换到下一行", pin_BLANK: "换行消隐：换行时先把输出关掉",
   pin_SDO: "串行数据输出：传给下一颗芯片（级联）", pin_DOUT: "串行数据输出：传给下一颗芯片（级联）",
@@ -420,7 +426,8 @@ zh: {
   th_refresh: "刷新率 (Hz)", th_frame: "帧率 (Hz)", th_scramble: "打散位数", th_pwm: "PWM 位数", th_total: "总灰度位数", th_scan: "扫描数", th_duty: "LED 点亮占空比",
 },
 en: {
-  back: "← All driver ICs", doc_suffix: "LED driver IC", used_in: "Used in", others: "Other driver ICs",
+  back: "← All driver ICs", doc_suffix: "LED driver IC",
+  pk_link: "<b>Packages compared</b>: how do SSOP, QFN and BGA differ? Which is easy to repair, which cools best →", used_in: "Used in", others: "Other driver ICs",
   f_ch: "Channels", f_scan: "Scan", f_cur: "Current / channel", f_acc: "Accuracy", f_pkg: "Package", f_drive: "Drive", f_gray: "Grayscale", f_refresh: "Refresh",
   h_3d: "Take a closer look",
   p_3d: "Drag to rotate, scroll to zoom, hover a pin or part to see what it does. Switch on “X-ray” to see the silicon die and gold bond wires inside. <b>Orange dots</b> are LED current, <b>blue dots</b> are data.",
@@ -432,7 +439,7 @@ en: {
   leg_dat: "Data: serial data and clock",
   pin: "Pin",
   pin_GND: "Ground: current leaves the chip here", pin_SDI: "Serial data in: grayscale data arrives bit by bit", pin_SIN: "Serial data in: grayscale data arrives bit by bit", pin_DIN: "Serial data in: grayscale data arrives bit by bit",
-  pin_DCLK: "Data clock: one data bit per clock edge", pin_LE: "Latch / command: the number of clocks while it is high selects the command", pin_LATCH: "Latch / command: the pulse length selects the command",
+  pin_DCLK: "Data clock: one data bit per clock edge", pin_LE: "Latch / command: the number of clocks while it is high selects the command", pin_LATCH: "Latch / command: the pulse length selects the command", pin_LAT: "Latch / command: different LAT lengths mean different commands",
   pin_OUT_sink: "Constant-current output: sinks one LED column's current", pin_OUT_source: "Constant-current output: sources current into one LED column",
   pin_ROW: "Row change: tells the chip to move to the next row", pin_ST: "Scan toggle: tells the chip to move to the next row", pin_BLANK: "Row-change blanking: switches outputs off while the row changes",
   pin_SDO: "Serial data out: passes data on to the next chip (cascade)", pin_DOUT: "Serial data out: passes data on to the next chip (cascade)",
@@ -453,7 +460,8 @@ en: {
   th_refresh: "Refresh (Hz)", th_frame: "Frame rate (Hz)", th_scramble: "Scramble bits", th_pwm: "PWM bits", th_total: "Total bits", th_scan: "Scans", th_duty: "LED on-duty",
 },
 de: {
-  back: "← Alle Treiber-ICs", doc_suffix: "LED-Treiber-IC", used_in: "Verbaut in", others: "Weitere Treiber-ICs",
+  back: "← Alle Treiber-ICs", doc_suffix: "LED-Treiber-IC",
+  pk_link: "<b>Gehäuse im Vergleich</b>: wie unterscheiden sich SSOP, QFN und BGA? Was ist leicht zu reparieren, was kühlt am besten →", used_in: "Verbaut in", others: "Weitere Treiber-ICs",
   f_ch: "Kanäle", f_scan: "Scan", f_cur: "Strom / Kanal", f_acc: "Genauigkeit", f_pkg: "Gehäuse", f_drive: "Ansteuerung", f_gray: "Graustufen", f_refresh: "Wiederholrate",
   h_3d: "Aus der Nähe betrachtet",
   p_3d: "Ziehen zum Drehen, Mausrad zum Zoomen, über einen Pin oder ein Bauteil fahren zeigt seine Funktion. Mit „Röntgenblick“ siehst du den Siliziumchip und die Gold-Bonddrähte im Inneren. <b>Orange Punkte</b> sind LED-Strom, <b>blaue Punkte</b> Daten.",
@@ -465,7 +473,7 @@ de: {
   leg_dat: "Daten: serielle Daten und Takt",
   pin: "Pin",
   pin_GND: "Masse: hier verlässt der Strom den Chip", pin_SDI: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an", pin_SIN: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an", pin_DIN: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an",
-  pin_DCLK: "Datentakt: ein Datenbit pro Taktflanke", pin_LE: "Latch / Befehl: die Anzahl Takte während High wählt den Befehl", pin_LATCH: "Latch / Befehl: die Pulslänge wählt den Befehl",
+  pin_DCLK: "Datentakt: ein Datenbit pro Taktflanke", pin_LE: "Latch / Befehl: die Anzahl Takte während High wählt den Befehl", pin_LATCH: "Latch / Befehl: die Pulslänge wählt den Befehl", pin_LAT: "Latch / Befehl: unterschiedliche LAT-Längen bedeuten unterschiedliche Befehle",
   pin_OUT_sink: "Konstantstromausgang: nimmt den Strom einer LED-Spalte auf (Senke)", pin_OUT_source: "Konstantstromausgang: liefert Strom in eine LED-Spalte (Quelle)",
   pin_ROW: "Zeilenwechsel: sagt dem Chip, zur nächsten Zeile zu wechseln", pin_ST: "Scan Toggle: sagt dem Chip, zur nächsten Zeile zu wechseln", pin_BLANK: "Austastung beim Zeilenwechsel: schaltet die Ausgänge kurz ab",
   pin_SDO: "Serieller Datenausgang: weiter zum nächsten Chip (Kaskade)", pin_DOUT: "Serieller Datenausgang: weiter zum nächsten Chip (Kaskade)",
@@ -666,7 +674,7 @@ function renderICPage() {
   applyCommon();
   document.title = `${ic.id} · ${t("doc_suffix")}`;
   $("#icName").textContent = ic.id;
-  $("#products").innerHTML = ic.products.map((p) => `<span class="chip">${esc(p)}</span>`).join("");
+  $("#products").innerHTML = ic.products.map((p) => `<span class="chip">${esc(L(p))}</span>`).join("");
   $("#facts").innerHTML = ic.facts.map(([k, v]) => `<div class="fact"><span>${t(k)}</span><b>${esc(L(v))}</b></div>`).join("");
   $("#cards").innerHTML = t("cards").map(([title, f, e]) => `<div class="card"><h3>${title}</h3><div class="f">${f}</div><p class="e">${e}</p></div>`).join("") +
     (t("warn_t") !== "warn_t" ? `<div class="card warn"><h3>${t("warn_t")}</h3><p class="e">${t("warn_e")}</p></div>` : "");
@@ -675,11 +683,13 @@ function renderICPage() {
   $("#steps").innerHTML = t("inside").map((n) => `<li>${n}</li>`).join("");
   $("#appSteps").innerHTML = t("app").map((n) => `<li>${n}</li>`).join("");
   $("#legCur").textContent = t(`leg_${ic.drive}`);
-  $("#icnav").innerHTML = IC_INDEX.map((x) => `<a href="ic-${x.id}.html"${x.id === ic.id ? ' aria-current="page"' : ""}>${x.id}<span>${x.products.join(" · ")}</span></a>`).join("");
+  $("#icnav").innerHTML = IC_INDEX.map((x) => `<a href="ic-${x.id}.html"${x.id === ic.id ? ' aria-current="page"' : ""}>${x.id}<span>${x.products.map(L).join(" · ")}</span></a>`).join("");
   drawApp($("#appSvg"), ic);
   drawBlock($("#blockSvg"), ic);
   $("#ccSec").classList.toggle("hidden", !ic.curve);
-  if (ic.curve) { drawCurve($("#curveSvg"), ic); setupCalc(ic); }
+  if (ic.curve) drawCurve($("#curveSvg"), ic);
+  $(".calc").classList.toggle("hidden", !ic.calc);
+  if (ic.calc) setupCalc(ic);
   $("#xmSec").classList.toggle("hidden", !ic.xm);
   if (ic.xm) drawXm(ic);
   listeners.forEach((fn) => fn());

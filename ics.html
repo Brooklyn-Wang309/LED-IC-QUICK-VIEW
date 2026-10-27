@@ -152,6 +152,10 @@ table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(-
 .cmp h3{font-size:14px;margin-bottom:6px}
 @media (max-width:820px){.concepts{grid-template-columns:1fr}}
 
+.pk-link{display:block;margin:14px 0 0;padding:12px 16px;background:var(--card);box-shadow:var(--shadow);color:var(--text);text-decoration:none;font-size:14.5px}
+.pk-link:hover{box-shadow:0 0 0 1px var(--strong)}
+.two:has(.calc.hidden){grid-template-columns:1fr}
+
 .concept .heat{animation:rise 1.8s ease-in infinite}
 .concept .heat:nth-of-type(2){animation-delay:.6s}.concept .heat:nth-of-type(3){animation-delay:1.2s}
 @keyframes rise{0%{opacity:0;transform:translateY(6px)}40%{opacity:.9}100%{opacity:0;transform:translateY(-14px)}}
@@ -174,6 +178,7 @@ table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(-
   <h2 data-i18n="ov_h_concepts"></h2>
   <p data-i18n="ov_p_concepts"></p>
   <div class="concepts" id="concepts"></div>
+  <a class="pk-link" href="packages.html" data-i18n="pk_link"></a>
 
   <h2 data-i18n="ov_h_ics"></h2>
   <div class="icgrid" id="icgrid"></div>
@@ -188,7 +193,7 @@ table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(-
 <script>
 const IC_ALL = [];
 const registerIC = (ic) => IC_ALL.push(ic);
-const IC_INDEX = [{"id": "ICND2055S", "products": ["AVORA", "MERI"], "maker": "Chipone", "drive": "sink"}, {"id": "ICND2069", "products": ["Jupiter", "VENUS"], "maker": "Chipone", "drive": "source"}, {"id": "ICND2169", "products": ["ARUNA"], "maker": "Chipone", "drive": "source"}, {"id": "CFD955B", "products": ["AURA"], "maker": "Chipfountain", "drive": "source"}, {"id": "MBI5264", "products": ["LUGH"], "maker": "Macroblock", "drive": "sink"}, {"id": "XM10480G", "products": ["LEDGend", "ENKI"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "XM11206G", "products": ["WINGSTER"], "maker": "Xm-Plus", "drive": "integrated"}];
+const IC_INDEX = [{"id": "ICND2055S", "products": ["AVORA", "MERI"], "maker": "Chipone", "drive": "sink"}, {"id": "ICND2069", "products": ["Jupiter", "VENUS"], "maker": "Chipone", "drive": "source"}, {"id": "ICND2169", "products": ["ARUNA"], "maker": "Chipone", "drive": "source"}, {"id": "CFD955B", "products": ["AURA"], "maker": "Chipfountain", "drive": "source"}, {"id": "MBI5264", "products": ["LUGH"], "maker": "Macroblock", "drive": "sink"}, {"id": "XM10480G", "products": ["LEDGend", "ENKI"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "XM11206G", "products": ["WINGSTER"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "TBS5267A", "products": [{"zh": "FOLDSTER 户外 P1.8", "en": "FOLDSTER outdoor P1.8", "de": "FOLDSTER Outdoor P1.8"}], "maker": "TBSILICON", "drive": "source"}, {"id": "DP3370S", "products": [{"zh": "FOLDSTER 户内 P1.5", "en": "FOLDSTER indoor P1.5", "de": "FOLDSTER Indoor P1.5"}], "maker": "Depu Micro", "drive": "sink"}, {"id": "ICND1065L", "products": [{"zh": "FOLDSTER 户内 P1.8", "en": "FOLDSTER indoor P1.8", "de": "FOLDSTER Indoor P1.8"}], "maker": "Chipone", "drive": "sink"}];
 // ---------- Xm-Plus 资料里的公共数据（Xm-Plus Product Introduction, Jun 2024） ----------
 // GEN2 刷新率配置表
 const XM_REFRESH_TABLE = [
@@ -1088,11 +1093,398 @@ registerIC({
   },
 });
 
+// TBS5267A · TBSILICON（NovaStar 体系）· FOLDSTER · 来源：TBS5267A Datasheet V3 (2025-03)
+registerIC({
+  id: "TBS5267A", maker: "TBSILICON", products: [{"zh": "FOLDSTER 户外 P1.8", "en": "FOLDSTER outdoor P1.8", "de": "FOLDSTER Outdoor P1.8"}], drive: "source",
+  facts: [["f_ch", "16"], ["f_scan", "1 : 64"], ["f_cur", "0.2–20 mA"], ["f_acc", "±1.5 % max"], ["f_gray", "16 bit PWM + 4 bit PAM"], ["f_pkg", "SSOP24 · QFN24"]],
+  scene: {
+    pkg: "sop24", pins: ["GND", "SIN", "DCLK", "LAT", ...Array.from({ length: 16 }, (_, i) => `OUT${i}`), "ROW", "SDO", "REXT", "VDD"],
+    data: ["SIN", "DCLK", "LAT"], vias: ["GND", "SIN", "DCLK", "LAT", "ROW", "SDO"], rext: "REXT",
+    mark: [{ text: "TBSILICON", size: 125, weight: 700 }, { text: "TBS5267A", size: 175 }, { text: "LOT NO.", size: 100, weight: 500 }],
+    led: { base: 0x2a0a08, glow: 0xff1a0a },
+    die: { blocks: ["SHIFT REG / SERIAL IF", "PWM SRAM", "CLK GEN", "TIMING / CONFIG", "IREF REGULATOR", "COMPARATORS ×16 · PAM"], out: "16 × CONSTANT-CURRENT SOURCE" },
+  },
+  app: { rows: 63, chain: "SIN → SDO → SIN …" },
+  block: {
+    A: { zh: "串行接口 / 移位寄存器", en: "Serial interface / shift register", de: "Serielle Schnittstelle / Schieberegister" },
+    B: "PWM SRAM",
+    C: { zh: "时钟发生器", en: "Clock generator", de: "Taktgenerator" },
+    D: { zh: "时序控制 / 配置寄存器", en: "Timing control / config", de: "Timing / Konfiguration" },
+    E: { zh: "LAT 命令 / ROW 换行", en: "LAT commands / ROW", de: "LAT-Befehle / ROW" },
+    F: { zh: "比较器 × 16（PWM + PAM）", en: "Comparators × 16 (PWM + PAM)", de: "Komparatoren × 16 (PWM + PAM)" },
+    G: { zh: "恒流输出 OUT0–15", en: "Constant-current outputs", de: "Konstantstromausgänge" },
+    H: { zh: "电流调节（增益 × 电流档）", en: "Current regulator (gain × grade)", de: "Stromregler (Gain × Stufe)" },
+    I: { zh: "开路 / 短路 / 过温检测", en: "Open / short / over-temp detect", de: "Unterbrechung / Kurzschluss / Übertemp." },
+    J: { zh: "预充电 / 去耦（去鬼影）", en: "Pre-charge / decouple (anti-ghost)", de: "Vorladung / Entkopplung" },
+    pins: { a: "SIN", c: "DCLK", e: "LAT / ROW", h: "REXT 6.04 kΩ", out: "SDO" },
+    led: { zh: "16 列 LED", en: "16 LED columns", de: "16 LED-Spalten" },
+  },
+  curve: { currents: [5, 12, 20], vmax: 1.2, imax: 25, rec: null },
+  text: {
+    zh: {
+      kicker: "驱动 IC · TBSILICON（NovaStar 体系）", subtitle: "64 扫 16 通道共阴 LED 驱动，PWM + 像素级 PAM",
+      oneliner: "<b>一句话：</b>一颗把“暗部画质”和“保护功能”都做得很全的共阴驱动：16 bit PWM 之外还能按像素调节电流幅度（PAM），并且能检测开路、短路和过温。",
+      note_3d: "外形按规格书尺寸建模（SSOP24，引脚间距 0.635 mm）；芯片内部结构和表面丝印为示意。示例中驱动 16 列红色 LED，电流从 VDD 进入芯片、经 OUT 引脚流向 LED（共阴）。",
+      p_app: "共阴扫描屏的结构（按规格书描述简化）：",
+      app: ["<b>行开关</b>（左）：轮流把某一行 LED 的<b>负极（阴极）</b>接地——共阴，支持 1–64 扫。", "<b>TBS5267A</b>（下）：每颗管 16 列，从 OUT 引脚<b>推出</b>恒流送进 LED 正极；红、绿、蓝各用一颗，所以红色可以单独用低电压。", "数据通过 SIN 送入，DCLK 的<b>上升沿和下降沿</b>都传数据；多颗芯片通过 SDO → SIN 串起来。ROW 从 0 变 1 表示换行。"],
+      cap_app: "示意图，只画了 6 行 × 12 列。",
+      inside: ["<b>收数据：</b>SIN 上的数据随 DCLK 移入，<b>双沿传输</b>：时钟最高 12.5 MHz，数据带宽可达 25 Mbps。", "<b>存整帧：</b>数据存进 PWM SRAM，支持 1–64 扫。", "<b>PWM + PAM：</b>比较器按灰度值控制点亮时间（最高 16 bit）；最暗的几级还可以用<b>像素级 PAM（最高 4 bit）</b>降低电流幅度，而不是只把点亮时间缩得很短——低灰更平滑、更准。", "<b>推出恒流：</b>电流由 REXT（固定 6.04 kΩ）、64 级全局增益和 15 级电流档共同设定。", "<b>检测与保护：</b>开路、短路、过温检测和保护，以及 LED 状态检测；还有待机和动态低功耗模式。"],
+      cap_block: "简化自规格书框图（第 3 节）。蓝线是数据，红线是 LED 电流。",
+      p_cc: "曲线是规格书第 8 节在 VDD = 3.8 / 4.2 / 5 V 下给出的恒流特性的示意：输出端只要留有不到 1 V 的余量，电流就基本不变。电流的设定公式是 Iout = 9600 ÷ Rext × Gain × MG（Rext 固定 6.04 kΩ，Gain 64 级、MG 15 级），但规格书没有写出 Gain 和 MG 的具体换算，所以这里不提供计算器。",
+      cap_curve: "示意曲线（Iout 5 / 12 / 20 mA）。鼠标移上去看数值。",
+      cards: [
+        ["暗部更细腻", "16 bit PWM + 4 bit 像素级 PAM", "最暗的几级灰度不只是缩短点亮时间，还可以按像素降低电流幅度（PAM），低灰更平滑、颜色更准。"],
+        ["刷新率高", "视觉刷新 3840 / 7680 Hz（取决于扫描数设计）", "拍屏不容易出现扫描线和闪烁。"],
+        ["更省电", "共阴 + 待机模式 + 芯片级 / 像素级动态低功耗", "红色可以低压供电；画面暗、全黑或局部黑时进一步降低功耗。"],
+        ["保护更全", "开路、短路、过温检测与保护 + LED 状态检测", "坏灯、短路或芯片过热能被发现并保护，减少故障扩大，也方便维护。"],
+        ["整屏更均匀", "通道间、芯片间都是 ±1.5 % 最大（典型 ±1 %）", "精度在这批芯片里仅次于 XM11206G。"],
+        ["低灰问题都有专门处理", "低灰均匀性、低灰偏色校正、首行偏暗、鬼影、坏灯十字消除", "暗场画面干净，坏点不会拖出十字线。"],
+        ["数据传输更省时钟", "双沿传输：DCLK 12.5 MHz → 25 Mbps", "上下沿都传数据，时钟频率可以更低，对电磁兼容有利。"],
+      ],
+      warn_t: "需要注意",
+      warn_e: "规格书没有写 Gain 和 MG 的具体换算，电流只能按公式和厂商工具设定；最大 20 mA 是在 VDD 3.8 V 下给出的。刷新率 3840 / 7680 Hz 取决于扫描数设计，不是任何配置下都能达到。",
+      specs: [
+        ["厂商", "TBSILICON（NovaStar 体系）"], ["驱动方式", "16 路恒流拉电流（共阴）"], ["扫描", "1–64（内置 SRAM）"], ["灰度", "最高 16 bit PWM + 最高 4 bit 像素级 PAM"],
+        ["视觉刷新率", "3840 / 7680 Hz（取决于扫描数设计）"], ["输出电流", "0.2–20 mA @ VDD 3.8 V"], ["电流精度（通道间 / 芯片间）", "±1 % typ · ±1.5 % max"],
+        ["电流设定", "Iout = 9600 ÷ Rext × Gain × MG\nRext 6.04 kΩ（1 %），Gain 64 级，MG 15 级"], ["供电 VDD", "2.8–5 V（典型 3.8 V）"], ["输出耐压", "9 V"],
+        ["数据接口", "DCLK ≤ 12.5 MHz，双沿 25 Mbps"], ["输出上升 / 下降时间", "30 ns / 50 ns"], ["检测与保护", "开路、短路、过温、LED 状态"],
+        ["封装", "SSOP24（TBS5267A-4CR）· QFN24（TBS5267A-1CR）"], ["最大功耗 / 热阻", "SSOP 1.76 W（71 °C/W）· QFN 2.55 W（49 °C/W）"], ["工作温度", "−40 … +85 °C"],
+      ],
+      notes: ["数据来源：TBS5267A Datasheet V3（2025 年 3 月）。", "芯片表面丝印为示意。", "规格书没有保密标注，但本网站其他页面有保密资料，整体仍按内部资料处理。", "“优势”和“对屏幕的意义”是根据规格书的解读，不是实测结果。"],
+    },
+    en: {
+      kicker: "Driver IC · TBSILICON (NovaStar ecosystem)", subtitle: "64-scan 16-channel common-cathode LED driver with PWM + pixel-level PAM",
+      oneliner: "<b>In one sentence:</b> a common-cathode driver that goes all-in on dark-scene quality and protection: beyond 16-bit PWM it can lower the current amplitude per pixel (PAM), and it detects open circuits, shorts and over-temperature.",
+      note_3d: "Package modelled to datasheet dimensions (SSOP24, 0.635 mm pitch); the inside and the top marking are illustrations. In this example it drives 16 columns of red LEDs; current enters at VDD and leaves through the OUT pins towards the LEDs (common cathode).",
+      p_app: "How a common-cathode scan display is built (simplified from the datasheet description):",
+      app: ["<b>Row switch</b> (left): grounds the <b>cathodes</b> of one row at a time – common cathode, 1–64 scans.", "<b>TBS5267A</b> (bottom): each handles 16 columns and <b>pushes</b> constant current out of its OUT pins into the anodes; red, green and blue each get a chip, so red can run on its own lower voltage.", "Data enters on SIN with data on <b>both DCLK edges</b>; chips chain SDO → SIN. ROW going from 0 to 1 marks a row change."],
+      cap_app: "Illustration, only 6 rows × 12 columns.",
+      inside: ["<b>Receive data:</b> data on SIN shifts in with DCLK using <b>dual-edge transfer</b>: up to 12.5 MHz clock, up to 25 Mbps.", "<b>Store the frame:</b> data goes into the PWM SRAM; 1–64 scans.", "<b>PWM + PAM:</b> comparators set each on-time from the grayscale value (up to 16 bits); for the darkest steps <b>pixel-level PAM (up to 4 bits)</b> lowers the current amplitude instead of only shortening the on-time – smoother, more accurate low grayscale.", "<b>Push constant current:</b> the current is set by REXT (fixed 6.04 kΩ), a 64-step global gain and a 15-step current grade.", "<b>Detect and protect:</b> open-circuit, short-circuit and over-temperature detection and protection plus LED status detection; standby and dynamic low-power modes as well."],
+      cap_block: "Simplified from the datasheet block diagram (section 3). Blue = data, red = LED current.",
+      p_cc: "The curves sketch the constant-current behaviour shown in section 8 at VDD = 3.8 / 4.2 / 5 V: with less than 1 V of headroom at the output the current stays essentially fixed. The current formula is Iout = 9600 ÷ Rext × Gain × MG (Rext fixed at 6.04 kΩ, Gain 64 steps, MG 15 steps), but the datasheet doesn't spell out how Gain and MG map to numbers, so there is no calculator here.",
+      cap_curve: "Illustrative curves (Iout 5 / 12 / 20 mA). Hover to read values.",
+      cards: [
+        ["Finer shadows", "16-bit PWM + 4-bit pixel-level PAM", "The darkest steps don't just get shorter on-times – the current amplitude can be lowered per pixel (PAM), for smoother, truer low grayscale."],
+        ["High refresh", "3840 / 7680 Hz visual refresh (depends on scan design)", "Cameras filming the screen rarely see scan lines or flicker."],
+        ["Less power", "Common cathode + standby + chip- and pixel-level dynamic low power", "Red runs on a lower voltage; power drops further for dark, black or partly black content."],
+        ["Better protection", "Open, short and over-temperature detection and protection + LED status detection", "Failed LEDs, shorts or an overheating chip are detected and contained – fewer cascading faults, easier service."],
+        ["More even", "±1.5 % max (±1 % typ) between channels and chips", "The best accuracy of the set after the XM11206G."],
+        ["Every low-grayscale issue handled", "Low-gray uniformity, colour-cast correction, first-line fix, ghosting, failure cross elimination", "Clean dark scenes, and dead pixels don't drag a cross."],
+        ["Fewer clock cycles", "Dual-edge transfer: 12.5 MHz DCLK → 25 Mbps", "Data on both edges allows a lower clock – good for EMC."],
+      ],
+      warn_t: "Keep in mind",
+      warn_e: "The datasheet doesn't give the Gain and MG mappings, so the current can only be set via the formula and the vendor's tools; the 20 mA maximum is specified at VDD 3.8 V. The 3840 / 7680 Hz refresh depends on the scan design and isn't reached in every configuration.",
+      specs: [
+        ["Manufacturer", "TBSILICON (NovaStar ecosystem)"], ["Drive", "16 constant-current sources (common cathode)"], ["Scan", "1–64 (built-in SRAM)"], ["Grayscale", "up to 16-bit PWM + up to 4-bit pixel-level PAM"],
+        ["Visual refresh", "3840 / 7680 Hz (depends on scan design)"], ["Output current", "0.2–20 mA @ VDD 3.8 V"], ["Current accuracy (channel / chip)", "±1 % typ · ±1.5 % max"],
+        ["Current setting", "Iout = 9600 ÷ Rext × Gain × MG\nRext 6.04 kΩ (1 %), Gain 64 steps, MG 15 steps"], ["Supply VDD", "2.8–5 V (typ. 3.8 V)"], ["Output sustaining voltage", "9 V"],
+        ["Data interface", "DCLK ≤ 12.5 MHz, dual-edge 25 Mbps"], ["Output rise / fall time", "30 ns / 50 ns"], ["Detection & protection", "open, short, over-temperature, LED status"],
+        ["Package", "SSOP24 (TBS5267A-4CR) · QFN24 (TBS5267A-1CR)"], ["Max. power / thermal resistance", "SSOP 1.76 W (71 °C/W) · QFN 2.55 W (49 °C/W)"], ["Operating temperature", "−40 … +85 °C"],
+      ],
+      notes: ["Source: TBS5267A Datasheet V3 (March 2025).", "The top marking is an illustration.", "This datasheet carries no confidentiality marking, but other pages of this site use confidential material, so the site as a whole stays internal.", "The strengths and their effect are an interpretation of the datasheet, not measurements."],
+    },
+    de: {
+      kicker: "Treiber-IC · TBSILICON (NovaStar-Ökosystem)", subtitle: "64-Scan-16-Kanal-LED-Treiber für gemeinsame Kathode mit PWM + PAM pro Pixel",
+      oneliner: "<b>In einem Satz:</b> ein Treiber für gemeinsame Kathode, der bei dunklen Szenen und Schutzfunktionen alles gibt: neben 16-Bit-PWM kann er die Stromamplitude pro Pixel senken (PAM) und erkennt Unterbrechungen, Kurzschlüsse und Übertemperatur.",
+      note_3d: "Gehäuse nach Datenblattmaßen modelliert (SSOP24, Raster 0,635 mm); Innenleben und Aufdruck sind Illustrationen. Im Beispiel treibt er 16 Spalten roter LEDs; der Strom kommt über VDD und fließt aus den OUT-Pins zu den LEDs (gemeinsame Kathode).",
+      p_app: "So ist ein Scan-Display mit gemeinsamer Kathode aufgebaut (vereinfacht nach dem Datenblatt):",
+      app: ["<b>Zeilenschalter</b> (links): legt jeweils die <b>Kathoden</b> einer Zeile auf Masse – gemeinsame Kathode, 1–64 Scans.", "<b>TBS5267A</b> (unten): je Chip 16 Spalten; er <b>drückt</b> Konstantstrom aus den OUT-Pins in die Anoden; Rot, Grün und Blau haben eigene Chips, daher kann Rot mit niedrigerer Spannung laufen.", "Die Daten kommen über SIN, an <b>beiden DCLK-Flanken</b>; die Chips sind über SDO → SIN verkettet. Wechselt ROW von 0 auf 1, beginnt die nächste Zeile."],
+      cap_app: "Illustration, nur 6 Zeilen × 12 Spalten.",
+      inside: ["<b>Daten empfangen:</b> Daten auf SIN werden mit DCLK übernommen, <b>an beiden Flanken</b>: bis 12,5 MHz Takt, bis 25 Mbit/s.", "<b>Bild speichern:</b> die Daten landen im PWM-SRAM; 1–64 Scans.", "<b>PWM + PAM:</b> Komparatoren bestimmen die Einschaltzeit aus dem Graustufenwert (bis 16 Bit); bei den dunkelsten Stufen senkt <b>PAM pro Pixel (bis 4 Bit)</b> die Stromamplitude, statt nur die Einschaltzeit zu verkürzen – weichere, genauere niedrige Graustufen.", "<b>Konstantstrom liefern:</b> der Strom ergibt sich aus REXT (fest 6,04 kΩ), einer 64-stufigen Gesamtverstärkung und einer 15-stufigen Stromstufe.", "<b>Erkennen und schützen:</b> Erkennung und Schutz bei Unterbrechung, Kurzschluss und Übertemperatur sowie LED-Statuserkennung; dazu Standby- und dynamische Energiesparmodi."],
+      cap_block: "Vereinfacht nach dem Blockschaltbild im Datenblatt (Abschnitt 3). Blau = Daten, Rot = LED-Strom.",
+      p_cc: "Die Kurven skizzieren das Konstantstromverhalten aus Abschnitt 8 bei VDD = 3,8 / 4,2 / 5 V: mit weniger als 1 V Reserve am Ausgang bleibt der Strom praktisch fest. Die Stromformel lautet Iout = 9600 ÷ Rext × Gain × MG (Rext fest 6,04 kΩ, Gain 64 Stufen, MG 15 Stufen), das Datenblatt nennt aber keine Zuordnung von Gain und MG zu Zahlen – daher gibt es hier keinen Rechner.",
+      cap_curve: "Illustrative Kurven (Iout 5 / 12 / 20 mA). Mit der Maus Werte ablesen.",
+      cards: [
+        ["Feinere Schatten", "16-Bit-PWM + 4-Bit-PAM pro Pixel", "Die dunkelsten Stufen bekommen nicht nur kürzere Einschaltzeiten – die Stromamplitude lässt sich pro Pixel senken (PAM), für weichere, genauere niedrige Graustufen."],
+        ["Hohe Wiederholrate", "3840 / 7680 Hz sichtbare Wiederholrate (abhängig vom Scan-Design)", "Kameras sehen kaum Scanlinien oder Flimmern."],
+        ["Sparsamer", "Gemeinsame Kathode + Standby + dynamisches Sparen auf Chip- und Pixelebene", "Rot läuft mit niedrigerer Spannung; bei dunklen, schwarzen oder teilweise schwarzen Inhalten sinkt die Leistung weiter."],
+        ["Besserer Schutz", "Erkennung und Schutz bei Unterbrechung, Kurzschluss, Übertemperatur + LED-Status", "Defekte LEDs, Kurzschlüsse oder ein überhitzter Chip werden erkannt und abgefangen – weniger Folgefehler, einfacherer Service."],
+        ["Gleichmäßiger", "±1,5 % max (±1 % typ) zwischen Kanälen und Chips", "Nach dem XM11206G die beste Genauigkeit der Reihe."],
+        ["Jedes Problem niedriger Graustufen adressiert", "Gleichmäßigkeit, Farbstich-Korrektur, erste Zeile, Geisterbilder, Kreuz-Unterdrückung", "Saubere dunkle Szenen, defekte Pixel ziehen kein Kreuz."],
+        ["Weniger Takt nötig", "Übertragung an beiden Flanken: 12,5 MHz DCLK → 25 Mbit/s", "Daten an beiden Flanken erlauben einen niedrigeren Takt – gut für die EMV."],
+      ],
+      warn_t: "Zu beachten",
+      warn_e: "Das Datenblatt nennt keine Zuordnung für Gain und MG, der Strom lässt sich nur über die Formel und die Herstellerwerkzeuge einstellen; das Maximum von 20 mA gilt bei VDD 3,8 V. Die 3840 / 7680 Hz hängen vom Scan-Design ab und werden nicht in jeder Konfiguration erreicht.",
+      specs: [
+        ["Hersteller", "TBSILICON (NovaStar-Ökosystem)"], ["Ansteuerung", "16 Konstantstromquellen (gemeinsame Kathode)"], ["Scan", "1–64 (integrierter SRAM)"], ["Graustufen", "bis 16 Bit PWM + bis 4 Bit PAM pro Pixel"],
+        ["Sichtbare Wiederholrate", "3840 / 7680 Hz (abhängig vom Scan-Design)"], ["Ausgangsstrom", "0,2–20 mA @ VDD 3,8 V"], ["Stromgenauigkeit (Kanal / Chip)", "±1 % typ · ±1,5 % max"],
+        ["Stromeinstellung", "Iout = 9600 ÷ Rext × Gain × MG\nRext 6,04 kΩ (1 %), Gain 64 Stufen, MG 15 Stufen"], ["Versorgung VDD", "2,8–5 V (typ. 3,8 V)"], ["Ausgangsspannungsfestigkeit", "9 V"],
+        ["Datenschnittstelle", "DCLK ≤ 12,5 MHz, beide Flanken 25 Mbit/s"], ["Anstiegs- / Abfallzeit", "30 ns / 50 ns"], ["Erkennung & Schutz", "Unterbrechung, Kurzschluss, Übertemperatur, LED-Status"],
+        ["Gehäuse", "SSOP24 (TBS5267A-4CR) · QFN24 (TBS5267A-1CR)"], ["Max. Leistung / Wärmewiderstand", "SSOP 1,76 W (71 °C/W) · QFN 2,55 W (49 °C/W)"], ["Betriebstemperatur", "−40 … +85 °C"],
+      ],
+      notes: ["Quelle: TBS5267A Datasheet V3 (März 2025).", "Der Aufdruck ist eine Illustration.", "Dieses Datenblatt trägt keinen Vertraulichkeitsvermerk, andere Seiten der Website nutzen aber vertrauliches Material – die Website bleibt insgesamt intern.", "Die Stärken und ihre Wirkung sind eine Auslegung des Datenblatts, keine Messwerte."],
+    },
+  },
+});
+
+// DP3370S · 深圳德普微电子 · FOLDSTER 户内 P1.5 · 来源：DP3370S datasheet Rev1.2 (2025-06)
+registerIC({
+  id: "DP3370S", maker: "Depu Micro", products: [{"zh": "FOLDSTER 户内 P1.5", "en": "FOLDSTER indoor P1.5", "de": "FOLDSTER Indoor P1.5"}], drive: "sink",
+  facts: [["f_ch", "16"], ["f_scan", { zh: "1 : 64（FOLDSTER 用 1 : 27）", en: "1 : 64 (FOLDSTER: 1 : 27)", de: "1 : 64 (FOLDSTER: 1 : 27)" }], ["f_cur", "0.5–36 mA"], ["f_acc", "±2 % max"], ["f_refresh", "7680 Hz @ 60 fps"], ["f_pkg", "QSOP24 · QFN24"], ["f_drive", { zh: "灌电流 · 共阳", en: "Sink · common anode", de: "Senke · gem. Anode" }]],
+  scene: {
+    pkg: "sop24", pins: ["GND", "SDI", "CLK", "LE", ...Array.from({ length: 16 }, (_, i) => `OUT${i}`), "ROW", "SDO", "REXT", "VDD"],
+    data: ["SDI", "CLK", "LE"], vias: ["GND", "SDI", "CLK", "LE", "ROW", "SDO"], rext: "REXT",
+    mark: [{ text: "DEPU", size: 150, weight: 700 }, { text: "DP3370S", size: 175 }, { text: "XXXXXX", size: 100, weight: 500 }],
+    led: { base: 0x2a0a08, glow: 0xff1a0a },
+    die: { blocks: ["16-BIT SHIFT REG", "SRAM", "PLL ×N", "PROTOCOL / REGISTERS", "IREF 20–200 %", "PWM GEN · DE-GHOST"], out: "16 × CONSTANT-CURRENT OUTPUT" },
+  },
+  app: { rows: 26, chain: "SDI → SDO → SDI …" },
+  block: {
+    A: { zh: "16 位移位寄存器", en: "16-bit shift register", de: "16-Bit-Schieberegister" },
+    B: { zh: "SRAM + 数据映射", en: "SRAM + data mapping", de: "SRAM + Datenzuordnung" },
+    C: { zh: "PLL 倍频 → GCLK", en: "PLL multiplier → GCLK", de: "PLL-Vervielfacher → GCLK" },
+    D: { zh: "PWM 生成", en: "PWM generation", de: "PWM-Erzeugung" },
+    E: { zh: "协议解析 / 寄存器", en: "Protocol / registers", de: "Protokoll / Register" },
+    F: { zh: "消影和解耦合", en: "De-ghosting & decoupling", de: "Entgeisterung & Entkopplung" },
+    G: { zh: "恒流输出 OUT0–15", en: "Constant-current outputs", de: "Konstantstromausgänge" },
+    H: { zh: "基准电流（增益 20–200 %）", en: "Reference current (gain 20–200 %)", de: "Referenzstrom (Gain 20–200 %)" },
+    I: { zh: "开路检测", en: "Open-circuit detection", de: "Unterbrechungserkennung" },
+    J: { zh: "黑屏节能", en: "Black-screen power saving", de: "Energiesparen bei Schwarz" },
+    pins: { a: "SDI", c: "CLK", e: "LE / ROW", h: "REXT", out: "SDO" },
+    led: { zh: "16 列 LED", en: "16 LED columns", de: "16 LED-Spalten" },
+  },
+  curve: { currents: [9, 18, 36], vmax: 1.2, imax: 40, rec: [0.3, 1.0] },
+  calc: { k: 19.6, gain: [12.5, 200, 0.5, 100], r: [0.5, 40], range: [0.5, 36], formula: { zh: "规格书公式：Iout = 19.6 ÷ Rext(kΩ) × IGAIN（12.5–200 %）", en: "Datasheet formula: Iout = 19.6 ÷ Rext(kΩ) × IGAIN (12.5–200 %)", de: "Formel aus dem Datenblatt: Iout = 19,6 ÷ Rext(kΩ) × IGAIN (12,5–200 %)" } },
+  text: {
+    zh: {
+      kicker: "驱动 IC · 深圳德普微电子", subtitle: "16 通道 64 扫低翻转 PWM 恒流驱动（共阳）",
+      oneliner: "<b>一句话：</b>FOLDSTER 户内 P1.5 用的共阳驱动。它把一帧切成很多组反复显示，在 60 帧下做到 <b>7680 Hz</b> 的视觉刷新——拍屏几乎看不到扫描线。",
+      note_3d: "外形按 QSOP24 封装建模（引脚间距 0.635 mm）；芯片内部结构和丝印为示意。示例中驱动 16 列红色 LED，电流从 LED 负极被“吸”进 OUT 引脚（共阳）。",
+      p_app: "规格书里的典型应用电路，简化后的样子。FOLDSTER 户内 P1.5 用 <b>1 : 27 扫描</b>，所以这里按 27 行来画：",
+      app: ["<b>行驱动单元</b>（左）：轮流给某一行 LED 的<b>正极（阳极）</b>通电——共阳，芯片支持 1–64 扫。", "<b>DP3370S</b>（下）：每颗管 16 列，红、绿、蓝各一颗。电流从 LED <b>负极</b>流进 OUT 引脚——<b>灌电流</b>。", "<b>控制器</b>把数据串行送进 SDI，用 CLK / LE 控制节奏（LE 的长度代表不同命令）；多颗芯片 SDO → SDI 串起来，ROW 信号告诉芯片换行。"],
+      cap_app: "简化自 DP3370S 规格书第 1 页“典型应用”。为看清楚只画了 6 行 × 12 列。",
+      inside: ["<b>收数据：</b>SDI 上的数据随 CLK 移进 16 位移位寄存器，协议解析单元按 LE 长度识别命令。", "<b>存起来：</b>数据经过“数据映射”存进片内 SRAM，最多 64 行，扫描时不用重发。", "<b>倍频：</b>内部 PLL 把 CLK 倍频成灰度时钟 GCLK——时钟在片内产生，板上走线频率低，<b>电磁干扰（EMI）更小</b>。", "<b>切组显示：</b>PWM 生成单元把一帧的点亮时间切成很多组反复显示（最多 256 倍刷新）。FOLDSTER：7680 Hz ÷ 60 帧 = <b>每帧 128 组</b>。", "<b>恒流输出：</b>电流由 REXT 和增益设定（也支持不接外部电阻的模式）；消影 / 解耦合电路处理鬼影和高低灰耦合，开路检测处理坏灯十字。"],
+      cap_block: "简化自规格书第 5.2 节框图。蓝线是数据，红线是 LED 电流。",
+      p_cc: "只要输出端电压超过“拐点”，电流就基本不变。DP3370S 的拐点很低：在 0.3 V 时已能输出 18 mA，0.6 V 时可到 36 mA。规格书推荐输出电压 VDS 保持在 <b>0.3–1.0 V</b>（浅红区域），再高只会变成热；芯片还有 5 档“拐点等级”可选。",
+      cap_curve: "曲线形状参照规格书第 9.2 节（VDD = 5 V）。鼠标移上去看数值。",
+      cards: [
+        ["拍屏不闪", "7680 Hz @ 60 fps（FOLDSTER 户内 P1.5）", "每帧切成 128 组显示，相机和手机拍屏几乎看不到扫描线，适合会议室、演播厅这类经常被拍的场合。"],
+        ["高灰也能高刷新", "高灰独立刷新，没有帧间黑场", "亮画面也保持高刷新，帧与帧之间不插黑场，画面更稳。"],
+        ["暗部更干净", "低灰均匀性、低灰色温逐级调节、PAM", "暗场不发花、不偏色；低灰的色温可以一级一级微调。"],
+        ["细节问题专门处理", "首行偏暗、上下鬼影、高低灰耦合、跨板耦合", "黑底上的亮块边缘干净，相邻灯板之间不互相“串色”。"],
+        ["坏一颗灯，不拖十字", "LED 开路检测 + 消除坏点十字", "一颗灯断路时，不会在同行同列拖出一个淡淡的十字。"],
+        ["电磁干扰低", "内置 PLL 产生 GCLK", "高速时钟只在芯片内部，板上走线频率低，EMI 更容易过认证。"],
+        ["电流范围大", "0.5–36 mA，增益 12.5–200 %", "同一颗芯片能配大小不同的灯珠，白平衡可在软件里细调。"],
+        ["黑屏省电", "黑屏节能：空闲电流从 4.6 mA 降到 0.9 mA", "画面全黑时，芯片自身耗电降低约 80 %。"],
+      ],
+      warn_t: "需要注意",
+      warn_e: "共阳方案红、绿、蓝共用一个电源电压，红灯多出来的电压会在芯片上变成热，所以这颗芯片的散热要靠灯板设计（QFN24 版本散热更好）。另外，英文规格书的标题写的是 “source driver”，正文却写“共阳”，典型电路也是灌电流——本页按共阳 / 灌电流处理。",
+      specs: [
+        ["厂商", "深圳德普微电子（Depu Microelectronics）"], ["驱动方式", "16 路恒流灌电流（共阳）"], ["扫描", "1–64 可调（FOLDSTER 户内 P1.5：1 : 27）"],
+        ["刷新率", "最高 256 倍刷新；FOLDSTER：7680 Hz @ 60 fps"], ["灰度", "最高 16 bit PWM，支持 PAM"], ["显示模式", "普通帧同步 / 高灰独立刷新（同步、异步）/ 低灰高刷新"],
+        ["输出电流", "0.5–18 mA（Vout = 0.3 V）\n0.5–36 mA（Vout = 0.6 V）"], ["电流精度 · 通道间", "±1.2 % typ · ±2.0 % max"], ["电流精度 · 芯片间", "±0.2 % typ · ±2.0 % max"],
+        ["电流公式", "Iout = 19.6 ÷ Rext × IGAIN（12.5–200 %）\n例：Rext 1 kΩ、IGAIN 100 % → 19.6 mA"], ["供电 VDD", "2.6–5.5 V"], ["输出耐压", "11 V"],
+        ["数据时钟 CLK", "≤ 25 MHz"], ["输出上升 / 下降时间", "45 ns / 35 ns"], ["芯片电流（3840 Hz，6 mA）", "白屏 4.6 mA · 黑屏 4.02 / 2.05 / 0.9 mA（三档节能）"],
+        ["ESD", "HBM ±8 kV · MM ±0.4 kV"], ["封装", "QSOP24 · QFN24（MSL 3）"], ["最大功耗 / 热阻", "QSOP24 2.01 W（62 °C/W）· QFN24 2.99 W（41.8 °C/W）"], ["工作温度", "−40 … +85 °C"],
+      ],
+      notes: ["数据来源：DP3370S datasheet Rev1.2（2025 年 6 月，英文版）。", "FOLDSTER 户内 P1.5 的 1 : 27 扫描和 7680 Hz @ 60 fps 来自产品配置，不是规格书数值。", "规格书标注为保密文件（禁止未经授权复制或传播）——本页图示均为重画，内部资料，请勿外传。", "芯片表面丝印为示意；“优势”是根据规格书的解读，不是实测结果。"],
+    },
+    en: {
+      kicker: "Driver IC · Shenzhen Depu Microelectronics", subtitle: "16-channel 64-scan low-transition PWM constant-current driver (common anode)",
+      oneliner: "<b>In one sentence:</b> the common-anode driver in FOLDSTER indoor P1.5. It splits each frame into many groups shown again and again, reaching a <b>7680 Hz</b> visual refresh at 60 fps – cameras see practically no scan lines.",
+      note_3d: "Package modelled as QSOP24 (0.635 mm pitch); the inside and the top marking are illustrations. In this example it drives 16 columns of red LEDs; the current is pulled from the LED cathodes into the OUT pins (common anode).",
+      p_app: "The typical application circuit from the datasheet, simplified. FOLDSTER indoor P1.5 uses <b>1 : 27 scan</b>, so 27 rows are drawn here:",
+      app: ["<b>Row drive unit</b> (left): powers the <b>anodes</b> of one row at a time – common anode; the chip supports 1–64 scans.", "<b>DP3370S</b> (bottom): each handles 16 columns, one chip each for red, green and blue. Current flows from the LED <b>cathodes</b> into the OUT pins – a <b>sink</b> driver.", "The <b>controller</b> shifts data into SDI, timed by CLK / LE (the LE length selects the command); chips chain SDO → SDI, and the ROW signal tells the chip to change rows."],
+      cap_app: "Simplified from the typical application on page 1 of the DP3370S datasheet. Only 6 rows × 12 columns are drawn for clarity.",
+      inside: ["<b>Receive data:</b> data on SDI shifts into a 16-bit shift register with CLK; the protocol unit recognises commands by the LE length.", "<b>Store it:</b> the data passes the data-mapping unit into on-chip SRAM, up to 64 rows, so nothing is resent while scanning.", "<b>Multiply the clock:</b> an internal PLL multiplies CLK into the grayscale clock GCLK – the fast clock stays on-chip, so board traces run slower and <b>EMI is lower</b>.", "<b>Show in groups:</b> the PWM generator splits each frame's on-time into many groups shown repeatedly (up to 256× refresh). FOLDSTER: 7680 Hz ÷ 60 fps = <b>128 groups per frame</b>.", "<b>Constant current:</b> set by REXT and the gain (a no-resistor mode exists too); de-ghosting / decoupling circuits handle ghosting and high-low grayscale coupling, open detection handles dead-pixel crosses."],
+      cap_block: "Simplified from the block diagram in datasheet section 5.2. Blue = data, red = LED current.",
+      p_cc: "Once the output voltage passes the “knee”, the current is essentially fixed. The DP3370S knee is low: 18 mA already at 0.3 V, up to 36 mA at 0.6 V. The datasheet recommends keeping VDS at <b>0.3–1.0 V</b> (pale red band); anything higher just becomes heat. The chip also offers 5 selectable knee levels.",
+      cap_curve: "Curve shapes follow datasheet section 9.2 (VDD = 5 V). Hover to read values.",
+      cards: [
+        ["No flicker on camera", "7680 Hz @ 60 fps (FOLDSTER indoor P1.5)", "Each frame is shown as 128 groups, so cameras and phones see practically no scan lines – ideal for meeting rooms and studios that get filmed."],
+        ["High refresh at high grayscale too", "High-grayscale independent refresh, no black field between frames", "Bright pictures keep the high refresh, with no black inserted between frames."],
+        ["Cleaner shadows", "Low-grayscale uniformity, step-by-step low-gray colour temperature, PAM", "Dark scenes don't look blotchy or tinted; the colour temperature of low grayscale can be tuned step by step."],
+        ["Detail problems handled", "Dim first line, upper/lower ghosting, high-low gray coupling, cross-board coupling", "Bright blocks on black have clean edges, and neighbouring LED boards don't bleed into each other."],
+        ["A dead LED doesn't draw a cross", "LED open detection + dead-pixel cross removal", "When one LED goes open, no faint cross appears along its row and column."],
+        ["Low EMI", "Internal PLL generates GCLK", "The fast clock stays inside the chip, board traces run slower and EMI certification is easier."],
+        ["Wide current range", "0.5–36 mA, gain 12.5–200 %", "One chip fits LEDs of different sizes; white balance can be fine-tuned in software."],
+        ["Saves power on black", "Black-screen saving: idle current from 4.6 mA down to 0.9 mA", "On an all-black picture the chip's own consumption drops by about 80 %."],
+      ],
+      warn_t: "Keep in mind",
+      warn_e: "With common anode, red, green and blue share one supply voltage; the surplus for red turns into heat in the chip, so cooling depends on the LED board design (the QFN24 version sheds heat better). Also, the English datasheet's title says “source driver” while the text says common anode and the typical circuit is a sink – this page treats it as common anode / sink.",
+      specs: [
+        ["Manufacturer", "Shenzhen Depu Microelectronics"], ["Drive", "16 constant-current sinks (common anode)"], ["Scan", "1–64 adjustable (FOLDSTER indoor P1.5: 1 : 27)"],
+        ["Refresh", "up to 256× refresh; FOLDSTER: 7680 Hz @ 60 fps"], ["Grayscale", "up to 16-bit PWM, PAM supported"], ["Display modes", "frame sync / high-gray independent refresh (sync, async) / low-gray high refresh"],
+        ["Output current", "0.5–18 mA (Vout = 0.3 V)\n0.5–36 mA (Vout = 0.6 V)"], ["Accuracy · channel to channel", "±1.2 % typ · ±2.0 % max"], ["Accuracy · chip to chip", "±0.2 % typ · ±2.0 % max"],
+        ["Current formula", "Iout = 19.6 ÷ Rext × IGAIN (12.5–200 %)\ne.g. Rext 1 kΩ, IGAIN 100 % → 19.6 mA"], ["Supply VDD", "2.6–5.5 V"], ["Output withstand voltage", "11 V"],
+        ["Data clock CLK", "≤ 25 MHz"], ["Output rise / fall time", "45 ns / 35 ns"], ["Chip current (3840 Hz, 6 mA)", "white 4.6 mA · black 4.02 / 2.05 / 0.9 mA (three saving levels)"],
+        ["ESD", "HBM ±8 kV · MM ±0.4 kV"], ["Package", "QSOP24 · QFN24 (MSL 3)"], ["Max. power / thermal resistance", "QSOP24 2.01 W (62 °C/W) · QFN24 2.99 W (41.8 °C/W)"], ["Operating temperature", "−40 … +85 °C"],
+      ],
+      notes: ["Source: DP3370S datasheet Rev1.2 (June 2025, English edition).", "The 1 : 27 scan and 7680 Hz @ 60 fps of FOLDSTER indoor P1.5 come from the product configuration, not from the datasheet.", "The datasheet is marked confidential (no copying or distribution without authorisation) – all diagrams here are redrawn. Internal, please don't share outside the company.", "The top marking is an illustration; the strengths are an interpretation of the datasheet, not measurements."],
+    },
+    de: {
+      kicker: "Treiber-IC · Shenzhen Depu Microelectronics", subtitle: "16-Kanal-64-Scan-PWM-Konstantstromtreiber mit wenig Schaltflanken (gemeinsame Anode)",
+      oneliner: "<b>In einem Satz:</b> der Treiber mit gemeinsamer Anode im FOLDSTER Indoor P1.5. Er teilt jedes Bild in viele Gruppen, die immer wieder gezeigt werden, und erreicht so bei 60 fps <b>7680 Hz</b> sichtbare Bildwiederholrate – Kameras sehen praktisch keine Scanlinien.",
+      note_3d: "Gehäuse als QSOP24 modelliert (Raster 0,635 mm); Inneres und Beschriftung sind Illustrationen. Im Beispiel treibt der Chip 16 Spalten roter LEDs; der Strom wird von den Kathoden in die OUT-Pins gezogen (gemeinsame Anode).",
+      p_app: "Die typische Anwendungsschaltung aus dem Datenblatt, vereinfacht. FOLDSTER Indoor P1.5 nutzt <b>1 : 27 Scan</b>, daher sind hier 27 Zeilen gezeichnet:",
+      app: ["<b>Zeilentreiber</b> (links): versorgt jeweils die <b>Anoden</b> einer Zeile – gemeinsame Anode; der Chip kann 1–64 Scans.", "<b>DP3370S</b> (unten): je Chip 16 Spalten, je ein Chip für Rot, Grün und Blau. Der Strom fließt von den <b>Kathoden</b> in die OUT-Pins – <b>Stromsenke</b>.", "Der <b>Controller</b> schiebt Daten in SDI, getaktet durch CLK / LE (die LE-Länge wählt den Befehl); Chips sind über SDO → SDI verkettet, das ROW-Signal meldet den Zeilenwechsel."],
+      cap_app: "Vereinfacht nach der typischen Anwendung auf Seite 1 des DP3370S-Datenblatts. Zur Übersicht nur 6 Zeilen × 12 Spalten.",
+      inside: ["<b>Daten empfangen:</b> Daten auf SDI werden mit CLK in ein 16-Bit-Schieberegister geschoben; die Protokolleinheit erkennt Befehle an der LE-Länge.", "<b>Speichern:</b> über die Datenzuordnung landen die Daten im On-Chip-SRAM, bis zu 64 Zeilen – beim Scannen wird nichts neu gesendet.", "<b>Takt vervielfachen:</b> eine interne PLL macht aus CLK den Graustufentakt GCLK – der schnelle Takt bleibt im Chip, die Leiterbahnen laufen langsamer, <b>weniger EMV-Störungen</b>.", "<b>In Gruppen zeigen:</b> der PWM-Generator teilt die Leuchtzeit eines Bildes in viele Gruppen, die wiederholt gezeigt werden (bis 256-fach). FOLDSTER: 7680 Hz ÷ 60 fps = <b>128 Gruppen pro Bild</b>.", "<b>Konstantstrom:</b> eingestellt über REXT und Verstärkung (auch ohne externen Widerstand möglich); Entgeisterung / Entkopplung gegen Geisterbilder und Kopplung, Unterbrechungserkennung gegen Kreuze bei defekten LEDs."],
+      cap_block: "Vereinfacht nach dem Blockschaltbild in Abschnitt 5.2. Blau = Daten, Rot = LED-Strom.",
+      p_cc: "Sobald die Ausgangsspannung das „Knie“ überschreitet, ist der Strom praktisch fest. Beim DP3370S liegt das Knie niedrig: 18 mA schon bei 0,3 V, bis 36 mA bei 0,6 V. Das Datenblatt empfiehlt VDS = <b>0,3–1,0 V</b> (hellroter Bereich); mehr wird nur zu Wärme. Zusätzlich gibt es 5 wählbare Knie-Stufen.",
+      cap_curve: "Kurvenform nach Abschnitt 9.2 (VDD = 5 V). Mit der Maus Werte ablesen.",
+      cards: [
+        ["Kein Flimmern vor der Kamera", "7680 Hz @ 60 fps (FOLDSTER Indoor P1.5)", "Jedes Bild wird in 128 Gruppen gezeigt – Kameras und Handys sehen praktisch keine Scanlinien, ideal für Besprechungsräume und Studios."],
+        ["Hohe Wiederholrate auch bei Hell", "Unabhängige Auffrischung hoher Graustufen, kein Schwarzbild zwischen Bildern", "Helle Bilder behalten die hohe Rate, zwischen den Bildern wird kein Schwarz eingefügt."],
+        ["Sauberere Schatten", "Gleichmäßigkeit bei niedrigen Graustufen, stufenweise Farbtemperatur, PAM", "Dunkle Szenen ohne Flecken oder Farbstich; die Farbtemperatur niedriger Graustufen ist stufenweise einstellbar."],
+        ["Detailprobleme gelöst", "Dunkle erste Zeile, Geisterbilder oben/unten, Kopplung hell–dunkel, Kopplung zwischen Platinen", "Helle Flächen auf Schwarz haben saubere Kanten, benachbarte Platinen beeinflussen sich nicht."],
+        ["Defekte LED ohne Kreuz", "LED-Unterbrechungserkennung + Kreuzunterdrückung", "Fällt eine LED offen aus, erscheint kein schwaches Kreuz in Zeile und Spalte."],
+        ["Geringe EMV-Störungen", "Interne PLL erzeugt GCLK", "Der schnelle Takt bleibt im Chip, die Leiterbahnen laufen langsamer – EMV-Prüfungen werden einfacher."],
+        ["Großer Strombereich", "0,5–36 mA, Verstärkung 12,5–200 %", "Ein Chip passt zu verschieden großen LEDs; Weißabgleich per Software."],
+        ["Spart bei Schwarz", "Energiesparen bei Schwarz: Ruhestrom von 4,6 mA auf 0,9 mA", "Bei komplett schwarzem Bild sinkt der Eigenverbrauch des Chips um etwa 80 %."],
+      ],
+      warn_t: "Zu beachten",
+      warn_e: "Bei gemeinsamer Anode teilen sich Rot, Grün und Blau eine Versorgungsspannung; der Überschuss für Rot wird im Chip zu Wärme – die Kühlung hängt vom Platinendesign ab (die QFN24-Variante leitet Wärme besser ab). Außerdem steht im Titel des englischen Datenblatts „source driver“, im Text aber gemeinsame Anode, und die typische Schaltung ist eine Senke – diese Seite behandelt den Chip als gemeinsame Anode / Senke.",
+      specs: [
+        ["Hersteller", "Shenzhen Depu Microelectronics"], ["Ansteuerung", "16 Konstantstromsenken (gemeinsame Anode)"], ["Scan", "1–64 einstellbar (FOLDSTER Indoor P1.5: 1 : 27)"],
+        ["Bildwiederholrate", "bis 256-fache Auffrischung; FOLDSTER: 7680 Hz @ 60 fps"], ["Graustufen", "bis 16 Bit PWM, PAM möglich"], ["Anzeigemodi", "Bildsynchron / unabhängige Auffrischung hoher Graustufen (sync, async) / niedrige Graustufen mit hoher Rate"],
+        ["Ausgangsstrom", "0,5–18 mA (Vout = 0,3 V)\n0,5–36 mA (Vout = 0,6 V)"], ["Genauigkeit · Kanal zu Kanal", "±1,2 % typ · ±2,0 % max"], ["Genauigkeit · Chip zu Chip", "±0,2 % typ · ±2,0 % max"],
+        ["Stromformel", "Iout = 19,6 ÷ Rext × IGAIN (12,5–200 %)\nz. B. Rext 1 kΩ, IGAIN 100 % → 19,6 mA"], ["Versorgung VDD", "2,6–5,5 V"], ["Ausgangsspannungsfestigkeit", "11 V"],
+        ["Datentakt CLK", "≤ 25 MHz"], ["Anstiegs- / Abfallzeit", "45 ns / 35 ns"], ["Chipstrom (3840 Hz, 6 mA)", "Weiß 4,6 mA · Schwarz 4,02 / 2,05 / 0,9 mA (drei Sparstufen)"],
+        ["ESD", "HBM ±8 kV · MM ±0,4 kV"], ["Gehäuse", "QSOP24 · QFN24 (MSL 3)"], ["Max. Verlustleistung / Wärmewiderstand", "QSOP24 2,01 W (62 °C/W) · QFN24 2,99 W (41,8 °C/W)"], ["Betriebstemperatur", "−40 … +85 °C"],
+      ],
+      notes: ["Quelle: DP3370S-Datenblatt Rev1.2 (Juni 2025, englische Ausgabe).", "1 : 27 Scan und 7680 Hz @ 60 fps des FOLDSTER Indoor P1.5 stammen aus der Produktkonfiguration, nicht aus dem Datenblatt.", "Das Datenblatt ist als vertraulich gekennzeichnet (keine Vervielfältigung oder Weitergabe ohne Genehmigung) – alle Grafiken sind neu gezeichnet. Intern, bitte nicht weitergeben.", "Die Beschriftung ist eine Illustration; die Stärken sind eine Auslegung des Datenblatts, keine Messwerte."],
+    },
+  },
+});
+
+// ICND1065L · Chipone · FOLDSTER 户内 P1.8 · 来源：ICND1065L datasheet V1.0 (Oct 2024)
+registerIC({
+  id: "ICND1065L", maker: "Chipone", products: [{"zh": "FOLDSTER 户内 P1.8", "en": "FOLDSTER indoor P1.8", "de": "FOLDSTER Indoor P1.8"}], drive: "sink",
+  facts: [["f_ch", "16"], ["f_scan", "1 : 64"], ["f_cur", "0.5–30 mA"], ["f_acc", "±2 % max"], ["f_pkg", "SSOP24"], ["f_drive", { zh: "灌电流 · 共阳", en: "Sink · common anode", de: "Senke · gem. Anode" }]],
+  scene: {
+    pkg: "sop24", pins: ["GND", "SDI", "DCLK", "LE", ...Array.from({ length: 16 }, (_, i) => `OUT${i}`), "ROW", "SDO", "REXT", "VDD"],
+    data: ["SDI", "DCLK", "LE"], vias: ["GND", "SDI", "DCLK", "LE", "ROW", "SDO"], rext: "REXT",
+    mark: [{ text: "CHIPONE", size: 150, weight: 700 }, { text: "ICND1065L", size: 170 }, { text: "LOT NO.", size: 100, weight: 500 }],
+    led: { base: 0x2a0a08, glow: 0xff1a0a },
+    die: { blocks: ["SHIFT REG", "SRAM", "PLL", "STATE / MBIST", "CURRENT REG", "COMPARATORS ×16"], out: "16 × CONSTANT-CURRENT OUTPUT" },
+  },
+  app: { rowIC: "ICND2018", rows: 63 },
+  block: {
+    A: { zh: "16 位移位寄存器", en: "16-bit shift register", de: "16-Bit-Schieberegister" },
+    B: { zh: "SRAM（整帧数据）", en: "SRAM (whole frame)", de: "SRAM (ganzes Bild)" },
+    C: "PLL → GCLK",
+    D: { zh: "数据处理 / GCLK 计数", en: "Data processing / GCLK counter", de: "Datenverarbeitung / GCLK-Zähler" },
+    E: { zh: "LE 计数 / 配置寄存器", en: "LE counter / config register", de: "LE-Zähler / Konfiguration" },
+    F: { zh: "比较器 × 16", en: "Comparators × 16", de: "Komparatoren × 16" },
+    G: { zh: "恒流输出 OUT0–15", en: "Constant-current outputs", de: "Konstantstromausgänge" },
+    H: { zh: "电流调节器", en: "Current regulator", de: "Stromregler" },
+    I: { zh: "LED 开路检测", en: "LED open detection", de: "LED-Unterbrechungserkennung" },
+    J: { zh: "预充电（去鬼影）", en: "Pre-charge (anti-ghosting)", de: "Vorladung (Anti-Ghosting)" },
+    pins: { a: "SDI", c: "DCLK", e: "LE / ROW", h: "REXT", out: "SDO" },
+    led: { zh: "16 列 LED", en: "16 LED columns", de: "16 LED-Spalten" },
+  },
+  curve: { currents: [5, 15, 25], vmax: 1.8, imax: 30, rec: [0.4, 1.0] },
+  calc: { k: 18, gain: [50, 200, 1, 100], r: [0.5, 40], range: [0.5, 30], formula: { zh: "规格书公式：Iout = 18 ÷ Rext(kΩ) × 增益（50–200 %）", en: "Datasheet formula: Iout = 18 ÷ Rext(kΩ) × gain (50–200 %)", de: "Formel aus dem Datenblatt: Iout = 18 ÷ Rext(kΩ) × Verstärkung (50–200 %)" } },
+  text: {
+    zh: {
+      kicker: "驱动 IC · Chipone 集创北方", subtitle: "16 通道 PWM 恒流灌电流 LED 驱动（1 : 64）",
+      oneliner: "<b>一句话：</b>FOLDSTER 户内 P1.8 用的共阳驱动。可以看成 AVORA / MERI 那颗 ICND2055S 的“64 扫加强版”：同一家厂、同样的引脚，扫描数翻倍、电流更大。",
+      note_3d: "外形按规格书尺寸建模（SSOP24-P-150-0.635）；芯片内部结构为示意。示例中驱动 16 列红色 LED，电流从 LED 负极被“吸”进 OUT 引脚（共阳）。",
+      p_app: "这是规格书里的典型 1:64 扫描电路，简化后的样子：",
+      app: ["<b>行驱动 ICND2018</b>（左）：8 颗 ICND2018 一起管 64 行，轮流给某一行 LED 的<b>正极（阳极）</b>通电——共阳。", "<b>ICND1065L</b>（下）：每颗管 16 列，红、绿、蓝各一颗，从 LED <b>负极</b>把电流“吸”进来——<b>灌电流</b>。", "<b>控制器</b>把红、绿、蓝数据分别送进各自的 SDI，DCLK / LE / ROW 共用；多颗芯片 SDO → SDI 串起来。"],
+      cap_app: "简化自 ICND1065L 规格书 “Application Information”。为看清楚只画了 6 行 × 12 列。",
+      inside: ["<b>收数据：</b>SDI 上的灰度数据随 DCLK（最高 20 MHz）一位一位移进 16 位移位寄存器。", "<b>存起来：</b>经地址映射存进片内 SRAM——64 行一整帧都存得下，扫描时不用重发。", "<b>数节拍：</b>内部 PLL 从 DCLK 生成灰度时钟 GCLK（5 V 下最高 80 MHz），GCLK 计数器跟着数。", "<b>比较：</b>每一路比较器拿计数值和灰度值比——没到就开，到了就关（PWM）。低灰时用“插帧算法”提高刷新率。", "<b>恒流输出：</b>电流调节器按 REXT 和增益稳住电流；预充电电路去鬼影，开路检测单元发现坏灯。芯片还带自检（MBIST）。"],
+      cap_block: "简化自规格书框图。蓝线是数据，红线是 LED 电流。",
+      p_cc: "只要输出端电压超过很低的“拐点”，电流就基本不变，每颗 LED 亮度一致。规格书推荐把输出电压 VDS 控制在 <b>0.4–1.0 V</b>（浅红区域），太高的电压只会变成热——这时可以降低 LED 供电，或串一个电阻 / 稳压管分压。",
+      cap_curve: "曲线形状参照规格书（VDD = 5 V，5 / 15 / 25 mA）。鼠标移上去看数值。",
+      cards: [
+        ["暗场更干净", "Noise Free™ 降噪 + 低灰偏色、不均匀优化", "低灰下电流也稳定，PCB 串扰被压住 → 暗部没有偏色和“马赛克”。"],
+        ["低灰也有高刷新", "插帧算法提高低灰刷新率", "暗画面拍屏也不容易出现扫描线。"],
+        ["整屏亮度均匀", "通道间、芯片间误差都 ≤ ±2 %（典型 ±1.25 %）", "模组、箱体拼在一起不容易“花屏”；还专门处理了模组间色差。"],
+        ["黑底白字更利落", "消除首行偏暗、高对比耦合", "高对比边缘干净，第一行不比别的行暗。"],
+        ["坏一颗灯，不拖一串", "单颗 LED 开路检测和反馈（防“毛毛虫”）", "一颗灯断路时，同列其他灯不会被带着微微亮成一条线，控制系统还能读到坏点位置。"],
+        ["没有鬼影", "集成预充电电路", "亮的内容下方不会出现淡淡的“残影”。"],
+        ["电流更大、扫描更多", "0.5–30 mA，1 : 64 扫（ICND2055S：25 mA，1 : 32）", "同一家族里能带更多行、更大的灯珠；8 位增益 50–200 % 方便调白平衡。"],
+        ["省电", "动态节能", "画面暗或全黑时降低芯片自身耗电。"],
+      ],
+      warn_t: "需要注意",
+      warn_e: "共阳：红、绿、蓝共用一个电源电压，红灯多出来的电压在芯片上变成热。这颗芯片只有 SSOP24 一种封装（热阻 64 °C/W），P1.8 灯板上要注意散热。规格书没有给出灰度位数和刷新率，所以本页不写这两项。",
+      specs: [
+        ["厂商", "Chipone Technology (Beijing)"], ["驱动方式", "16 路恒流灌电流（共阳）"], ["扫描", "1 : 64"],
+        ["输出电流", "0.5–30 mA × 16 @ VDD 5 V\n0.5–20 mA × 16 @ VDD 4.2 V\n0.5–15 mA × 16 @ VDD 3.3 V"], ["电流精度（通道间 / 芯片间）", "±1.25 % typ · ±2.0 % max"],
+        ["电流增益", "50–200 %（50–100 % 步进 1.5625 %，100–200 % 步进 3.125 %）"], ["电流公式", "Iout = 18 ÷ Rext × Gain"], ["供电 VDD", "3.3–5.5 V"],
+        ["数据时钟 DCLK", "≤ 20 MHz"], ["灰度时钟 GCLK", "内部 PLL，≤ 80 MHz（5 V）/ 75 MHz（3.3 V）"], ["输出上升 / 下降时间", "50 ns / 35 ns（5 V）"],
+        ["芯片电流", "4.3 mA（输出开）· 2.6 mA（输出关）@ 5 V"], ["封装", "SSOP24（0.635 mm）"], ["最大功耗 / 热阻（25 °C）", "1.98 W（64 °C/W，4 层板）"],
+        ["工作温度", "−40 … +85 °C"], ["配套行驱动", "ICND2018"],
+      ],
+      notes: ["数据来源：ICND1065L datasheet V1.0（2024 年 10 月）。", "规格书没有直接给出灰度位数和刷新率，所以本页不写这两项。", "“优势”和“对屏幕的意义”是根据规格书的解读，不是实测结果。", "内部资料，请勿外传。"],
+    },
+    en: {
+      kicker: "Driver IC · Chipone", subtitle: "16-channel PWM constant-current LED sink driver (1 : 64)",
+      oneliner: "<b>In one sentence:</b> the common-anode driver in FOLDSTER indoor P1.8. Think of it as the “64-scan big brother” of the ICND2055S in AVORA / MERI: same maker, same pinout, twice the scan lines and more current.",
+      note_3d: "Package modelled to datasheet dimensions (SSOP24-P-150-0.635); the inside is an illustration. In this example it drives 16 columns of red LEDs; the current is pulled from the LED cathodes into the OUT pins (common anode).",
+      p_app: "The typical 1:64 scan circuit from the datasheet, simplified:",
+      app: ["<b>Row driver ICND2018</b> (left): eight ICND2018 together handle 64 rows, powering the <b>anodes</b> of one row at a time – common anode.", "<b>ICND1065L</b> (bottom): each handles 16 columns, one chip each for red, green and blue, pulling current in from the LED <b>cathodes</b> – a <b>sink</b> driver.", "The <b>controller</b> sends red, green and blue data to their own SDI; DCLK / LE / ROW are shared; chips chain SDO → SDI."],
+      cap_app: "Simplified from the ICND1065L datasheet, “Application Information”. Only 6 rows × 12 columns are drawn for clarity.",
+      inside: ["<b>Receive data:</b> grayscale data on SDI shifts into a 16-bit shift register, one bit per DCLK (up to 20 MHz).", "<b>Store it:</b> via the address mapping unit into on-chip SRAM – a whole 64-row frame fits, so nothing is resent while scanning.", "<b>Count the beat:</b> an internal PLL makes the grayscale clock GCLK (up to 80 MHz at 5 V) from DCLK; the GCLK counter counts along.", "<b>Compare:</b> each channel's comparator checks the count against its grayscale value – below, on; reached, off (PWM). At low grayscale a frame-insertion algorithm raises the refresh rate.", "<b>Constant current:</b> the current regulator holds the current set by REXT and the gain; a pre-charge circuit removes ghosting and the open-detection unit finds dead LEDs. The chip also has a built-in self-test (MBIST)."],
+      cap_block: "Simplified from the datasheet block diagram. Blue = data, red = LED current.",
+      p_cc: "Once the output voltage passes a low “knee”, the current is essentially fixed, so every LED is equally bright. The datasheet recommends VDS = <b>0.4–1.0 V</b> (pale red band); more voltage just turns into heat – lower the LED supply or drop the surplus over a resistor / Zener diode.",
+      cap_curve: "Curve shapes follow the datasheet (VDD = 5 V, 5 / 15 / 25 mA). Hover to read values.",
+      cards: [
+        ["Cleaner dark scenes", "Noise Free™ + fixes for low-gray colour shift and non-uniformity", "Current stays stable at low grayscale and PCB crosstalk is suppressed → shadows without tint or blotches."],
+        ["High refresh at low grayscale", "Frame-insertion algorithm", "Dark pictures don't show scan lines on camera either."],
+        ["Even brightness across the wall", "≤ ±2 % between channels and chips (±1.25 % typ)", "Modules and cabinets don't look patchy; colour differences between modules are addressed too."],
+        ["Crisp text on black", "Fixes the dim first scan line and high-contrast coupling", "Clean high-contrast edges; the first row isn't darker."],
+        ["One dead LED stays one dead LED", "Individual LED open detection and feedback (anti-“caterpillar”)", "The rest of the column doesn't glow faintly, and the control system can read where the dead pixel is."],
+        ["No ghosting", "Integrated pre-charge circuit", "No faint trail below bright content."],
+        ["More current, more scan lines", "0.5–30 mA, 1 : 64 (ICND2055S: 25 mA, 1 : 32)", "Drives more rows and bigger LEDs within the same family; 8-bit gain 50–200 % for white balance."],
+        ["Saves power", "Dynamic power saving", "Cuts the chip's own consumption on dark or black pictures."],
+      ],
+      warn_t: "Keep in mind",
+      warn_e: "Common anode: red, green and blue share one supply voltage and red's surplus turns into heat in the chip. This chip only comes as SSOP24 (64 °C/W), so watch the cooling on the P1.8 LED board. The datasheet gives neither grayscale bit depth nor refresh rate, so this page leaves them out.",
+      specs: [
+        ["Manufacturer", "Chipone Technology (Beijing)"], ["Drive", "16 constant-current sinks (common anode)"], ["Scan", "1 : 64"],
+        ["Output current", "0.5–30 mA × 16 @ VDD 5 V\n0.5–20 mA × 16 @ VDD 4.2 V\n0.5–15 mA × 16 @ VDD 3.3 V"], ["Current accuracy (channel / chip)", "±1.25 % typ · ±2.0 % max"],
+        ["Current gain", "50–200 % (1.5625 % steps up to 100 %, 3.125 % above)"], ["Current formula", "Iout = 18 ÷ Rext × Gain"], ["Supply VDD", "3.3–5.5 V"],
+        ["Data clock DCLK", "≤ 20 MHz"], ["Grayscale clock GCLK", "internal PLL, ≤ 80 MHz (5 V) / 75 MHz (3.3 V)"], ["Output rise / fall time", "50 ns / 35 ns (5 V)"],
+        ["Chip current", "4.3 mA (outputs on) · 2.6 mA (off) @ 5 V"], ["Package", "SSOP24 (0.635 mm)"], ["Max. power / thermal resistance (25 °C)", "1.98 W (64 °C/W, 4-layer PCB)"],
+        ["Operating temperature", "−40 … +85 °C"], ["Paired row driver", "ICND2018"],
+      ],
+      notes: ["Source: ICND1065L datasheet V1.0 (October 2024).", "The datasheet doesn't state grayscale bit depth or refresh rate, so this page leaves them out.", "The strengths and their effect on the screen are an interpretation of the datasheet, not measurements.", "Internal – please don't share outside the company."],
+    },
+    de: {
+      kicker: "Treiber-IC · Chipone", subtitle: "16-Kanal-PWM-Konstantstrom-LED-Treiber, Stromsenke (1 : 64)",
+      oneliner: "<b>In einem Satz:</b> der Treiber mit gemeinsamer Anode im FOLDSTER Indoor P1.8. Quasi der „große Bruder mit 64 Scans“ des ICND2055S aus AVORA / MERI: gleicher Hersteller, gleiche Pinbelegung, doppelt so viele Scanzeilen und mehr Strom.",
+      note_3d: "Gehäuse nach Datenblattmaßen modelliert (SSOP24-P-150-0.635); das Innere ist eine Illustration. Im Beispiel treibt der Chip 16 Spalten roter LEDs; der Strom wird von den Kathoden in die OUT-Pins gezogen (gemeinsame Anode).",
+      p_app: "Die typische 1:64-Scan-Schaltung aus dem Datenblatt, vereinfacht:",
+      app: ["<b>Zeilentreiber ICND2018</b> (links): acht ICND2018 versorgen zusammen 64 Zeilen, jeweils die <b>Anoden</b> einer Zeile – gemeinsame Anode.", "<b>ICND1065L</b> (unten): je Chip 16 Spalten, je ein Chip für Rot, Grün und Blau; er zieht den Strom von den <b>Kathoden</b> ab – <b>Stromsenke</b>.", "Der <b>Controller</b> schickt Rot-, Grün- und Blaudaten an das jeweilige SDI; DCLK / LE / ROW sind gemeinsam; Chips sind über SDO → SDI verkettet."],
+      cap_app: "Vereinfacht nach dem ICND1065L-Datenblatt, „Application Information“. Zur Übersicht nur 6 Zeilen × 12 Spalten.",
+      inside: ["<b>Daten empfangen:</b> Graustufendaten auf SDI werden mit DCLK (bis 20 MHz) Bit für Bit in ein 16-Bit-Schieberegister geschoben.", "<b>Speichern:</b> über die Adresszuordnung ins On-Chip-SRAM – ein ganzes Bild mit 64 Zeilen passt hinein.", "<b>Takt zählen:</b> eine interne PLL erzeugt aus DCLK den Graustufentakt GCLK (bis 80 MHz bei 5 V), der GCLK-Zähler zählt mit.", "<b>Vergleichen:</b> der Komparator jedes Kanals vergleicht Zählerstand und Graustufenwert – darunter an, erreicht aus (PWM). Bei niedrigen Graustufen erhöht ein Bild-Einfüge-Algorithmus die Wiederholrate.", "<b>Konstantstrom:</b> der Stromregler hält den über REXT und Verstärkung eingestellten Strom; eine Vorladeschaltung verhindert Geisterbilder, die Unterbrechungserkennung findet defekte LEDs. Dazu ein eingebauter Selbsttest (MBIST)."],
+      cap_block: "Vereinfacht nach dem Blockschaltbild im Datenblatt. Blau = Daten, Rot = LED-Strom.",
+      p_cc: "Sobald die Ausgangsspannung ein niedriges „Knie“ überschreitet, ist der Strom praktisch fest – alle LEDs leuchten gleich hell. Das Datenblatt empfiehlt VDS = <b>0,4–1,0 V</b> (hellroter Bereich); mehr wird nur zu Wärme – dann die LED-Versorgung senken oder den Überschuss an einem Widerstand / einer Z-Diode abfallen lassen.",
+      cap_curve: "Kurvenform nach dem Datenblatt (VDD = 5 V, 5 / 15 / 25 mA). Mit der Maus Werte ablesen.",
+      cards: [
+        ["Sauberere dunkle Szenen", "Noise Free™ + gegen Farbstich und Ungleichmäßigkeit bei niedrigen Graustufen", "Der Strom bleibt auch bei niedrigen Graustufen stabil, PCB-Übersprechen wird unterdrückt → Schatten ohne Farbstich oder Flecken."],
+        ["Hohe Rate auch bei Dunkel", "Bild-Einfüge-Algorithmus", "Auch dunkle Bilder zeigen vor der Kamera keine Scanlinien."],
+        ["Gleichmäßige Helligkeit", "≤ ±2 % zwischen Kanälen und Chips (±1,25 % typ)", "Module und Kabinette wirken nicht fleckig; Farbunterschiede zwischen Modulen werden ebenfalls behandelt."],
+        ["Klarer Text auf Schwarz", "Gegen dunkle erste Scanzeile und Kopplung bei hohem Kontrast", "Saubere Kontrastkanten; die erste Zeile ist nicht dunkler."],
+        ["Eine defekte LED bleibt eine", "Erkennung einzelner offener LEDs mit Rückmeldung (gegen „Raupen“)", "Der Rest der Spalte glimmt nicht mit, und das Steuersystem kann die Position des Defekts auslesen."],
+        ["Keine Geisterbilder", "Integrierte Vorladeschaltung", "Unter hellen Inhalten erscheint keine schwache Spur."],
+        ["Mehr Strom, mehr Scanzeilen", "0,5–30 mA, 1 : 64 (ICND2055S: 25 mA, 1 : 32)", "Mehr Zeilen und größere LEDs in derselben Familie; 8-Bit-Verstärkung 50–200 % für den Weißabgleich."],
+        ["Spart Energie", "Dynamisches Energiesparen", "Senkt den Eigenverbrauch bei dunklem oder schwarzem Bild."],
+      ],
+      warn_t: "Zu beachten",
+      warn_e: "Gemeinsame Anode: Rot, Grün und Blau teilen sich eine Versorgungsspannung, der Überschuss für Rot wird im Chip zu Wärme. Den Chip gibt es nur als SSOP24 (64 °C/W) – auf der P1.8-Platine auf die Kühlung achten. Das Datenblatt nennt weder Graustufen-Bittiefe noch Bildwiederholrate, daher fehlen sie hier.",
+      specs: [
+        ["Hersteller", "Chipone Technology (Beijing)"], ["Ansteuerung", "16 Konstantstromsenken (gemeinsame Anode)"], ["Scan", "1 : 64"],
+        ["Ausgangsstrom", "0,5–30 mA × 16 @ VDD 5 V\n0,5–20 mA × 16 @ VDD 4,2 V\n0,5–15 mA × 16 @ VDD 3,3 V"], ["Stromgenauigkeit (Kanal / Chip)", "±1,25 % typ · ±2,0 % max"],
+        ["Stromverstärkung", "50–200 % (bis 100 % in 1,5625-%-Schritten, darüber 3,125 %)"], ["Stromformel", "Iout = 18 ÷ Rext × Gain"], ["Versorgung VDD", "3,3–5,5 V"],
+        ["Datentakt DCLK", "≤ 20 MHz"], ["Graustufentakt GCLK", "interne PLL, ≤ 80 MHz (5 V) / 75 MHz (3,3 V)"], ["Anstiegs- / Abfallzeit", "50 ns / 35 ns (5 V)"],
+        ["Chipstrom", "4,3 mA (Ausgänge an) · 2,6 mA (aus) @ 5 V"], ["Gehäuse", "SSOP24 (0,635 mm)"], ["Max. Verlustleistung / Wärmewiderstand (25 °C)", "1,98 W (64 °C/W, 4-Lagen-Platine)"],
+        ["Betriebstemperatur", "−40 … +85 °C"], ["Passender Zeilentreiber", "ICND2018"],
+      ],
+      notes: ["Quelle: ICND1065L-Datenblatt V1.0 (Oktober 2024).", "Das Datenblatt nennt weder Graustufen-Bittiefe noch Bildwiederholrate, daher fehlen sie hier.", "Die Stärken und ihre Wirkung auf den Bildschirm sind eine Auslegung des Datenblatts, keine Messwerte.", "Intern – bitte nicht außerhalb des Unternehmens weitergeben."],
+    },
+  },
+});
+
 // ---------- IC 页面公用：文案、语言/主题、图表 ----------
 // 每个 IC 页面先 registerIC(...)，再加载本文件。IC 是当前页面的芯片（总览页为 null）。
 const COMMON = {
 zh: {
-  back: "← 全部驱动 IC", doc_suffix: "LED 驱动 IC", used_in: "用于", others: "其他驱动 IC",
+  back: "← 全部驱动 IC", doc_suffix: "LED 驱动 IC",
+  pk_link: "<b>封装对比</b>：SSOP、QFN、BGA 有什么不同？哪种好修、哪种散热好 →", used_in: "用于", others: "其他驱动 IC",
   f_ch: "通道", f_scan: "扫描", f_cur: "单路电流", f_acc: "电流精度", f_pkg: "封装", f_drive: "驱动方式", f_gray: "灰度", f_refresh: "刷新率",
   h_3d: "拿在手里看一看",
   p_3d: "拖动旋转、滚轮缩放，鼠标移到引脚或器件上可以看到它的作用。打开“透视内部”能看到芯片里的硅片和金线。<b>橙色光点</b>是流过 LED 的电流，<b>蓝色光点</b>是数据。",
@@ -1104,7 +1496,7 @@ zh: {
   leg_dat: "数据：串行数据和时钟",
   pin: "引脚",
   pin_GND: "地：电流从这里流出芯片", pin_SDI: "串行数据输入：灰度数据一位一位送进来", pin_SIN: "串行数据输入：灰度数据一位一位送进来", pin_DIN: "串行数据输入：灰度数据一位一位送进来",
-  pin_DCLK: "数据时钟：每个时钟边沿移入一位数据", pin_LE: "锁存 / 命令：高电平期间数几个时钟，就是哪条命令", pin_LATCH: "锁存 / 命令：用脉冲长度区分不同命令",
+  pin_DCLK: "数据时钟：每个时钟边沿移入一位数据", pin_LE: "锁存 / 命令：高电平期间数几个时钟，就是哪条命令", pin_LATCH: "锁存 / 命令：用脉冲长度区分不同命令", pin_LAT: "锁存 / 命令：LAT 的长度不同，代表不同的命令",
   pin_OUT_sink: "恒流输出：吸入一列 LED 的电流（灌电流）", pin_OUT_source: "恒流输出：向一列 LED 送出电流（拉电流）",
   pin_ROW: "换行信号：告诉芯片换到下一行", pin_ST: "换行信号（Scan toggle）：告诉芯片换到下一行", pin_BLANK: "换行消隐：换行时先把输出关掉",
   pin_SDO: "串行数据输出：传给下一颗芯片（级联）", pin_DOUT: "串行数据输出：传给下一颗芯片（级联）",
@@ -1125,7 +1517,8 @@ zh: {
   th_refresh: "刷新率 (Hz)", th_frame: "帧率 (Hz)", th_scramble: "打散位数", th_pwm: "PWM 位数", th_total: "总灰度位数", th_scan: "扫描数", th_duty: "LED 点亮占空比",
 },
 en: {
-  back: "← All driver ICs", doc_suffix: "LED driver IC", used_in: "Used in", others: "Other driver ICs",
+  back: "← All driver ICs", doc_suffix: "LED driver IC",
+  pk_link: "<b>Packages compared</b>: how do SSOP, QFN and BGA differ? Which is easy to repair, which cools best →", used_in: "Used in", others: "Other driver ICs",
   f_ch: "Channels", f_scan: "Scan", f_cur: "Current / channel", f_acc: "Accuracy", f_pkg: "Package", f_drive: "Drive", f_gray: "Grayscale", f_refresh: "Refresh",
   h_3d: "Take a closer look",
   p_3d: "Drag to rotate, scroll to zoom, hover a pin or part to see what it does. Switch on “X-ray” to see the silicon die and gold bond wires inside. <b>Orange dots</b> are LED current, <b>blue dots</b> are data.",
@@ -1137,7 +1530,7 @@ en: {
   leg_dat: "Data: serial data and clock",
   pin: "Pin",
   pin_GND: "Ground: current leaves the chip here", pin_SDI: "Serial data in: grayscale data arrives bit by bit", pin_SIN: "Serial data in: grayscale data arrives bit by bit", pin_DIN: "Serial data in: grayscale data arrives bit by bit",
-  pin_DCLK: "Data clock: one data bit per clock edge", pin_LE: "Latch / command: the number of clocks while it is high selects the command", pin_LATCH: "Latch / command: the pulse length selects the command",
+  pin_DCLK: "Data clock: one data bit per clock edge", pin_LE: "Latch / command: the number of clocks while it is high selects the command", pin_LATCH: "Latch / command: the pulse length selects the command", pin_LAT: "Latch / command: different LAT lengths mean different commands",
   pin_OUT_sink: "Constant-current output: sinks one LED column's current", pin_OUT_source: "Constant-current output: sources current into one LED column",
   pin_ROW: "Row change: tells the chip to move to the next row", pin_ST: "Scan toggle: tells the chip to move to the next row", pin_BLANK: "Row-change blanking: switches outputs off while the row changes",
   pin_SDO: "Serial data out: passes data on to the next chip (cascade)", pin_DOUT: "Serial data out: passes data on to the next chip (cascade)",
@@ -1158,7 +1551,8 @@ en: {
   th_refresh: "Refresh (Hz)", th_frame: "Frame rate (Hz)", th_scramble: "Scramble bits", th_pwm: "PWM bits", th_total: "Total bits", th_scan: "Scans", th_duty: "LED on-duty",
 },
 de: {
-  back: "← Alle Treiber-ICs", doc_suffix: "LED-Treiber-IC", used_in: "Verbaut in", others: "Weitere Treiber-ICs",
+  back: "← Alle Treiber-ICs", doc_suffix: "LED-Treiber-IC",
+  pk_link: "<b>Gehäuse im Vergleich</b>: wie unterscheiden sich SSOP, QFN und BGA? Was ist leicht zu reparieren, was kühlt am besten →", used_in: "Verbaut in", others: "Weitere Treiber-ICs",
   f_ch: "Kanäle", f_scan: "Scan", f_cur: "Strom / Kanal", f_acc: "Genauigkeit", f_pkg: "Gehäuse", f_drive: "Ansteuerung", f_gray: "Graustufen", f_refresh: "Wiederholrate",
   h_3d: "Aus der Nähe betrachtet",
   p_3d: "Ziehen zum Drehen, Mausrad zum Zoomen, über einen Pin oder ein Bauteil fahren zeigt seine Funktion. Mit „Röntgenblick“ siehst du den Siliziumchip und die Gold-Bonddrähte im Inneren. <b>Orange Punkte</b> sind LED-Strom, <b>blaue Punkte</b> Daten.",
@@ -1170,7 +1564,7 @@ de: {
   leg_dat: "Daten: serielle Daten und Takt",
   pin: "Pin",
   pin_GND: "Masse: hier verlässt der Strom den Chip", pin_SDI: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an", pin_SIN: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an", pin_DIN: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an",
-  pin_DCLK: "Datentakt: ein Datenbit pro Taktflanke", pin_LE: "Latch / Befehl: die Anzahl Takte während High wählt den Befehl", pin_LATCH: "Latch / Befehl: die Pulslänge wählt den Befehl",
+  pin_DCLK: "Datentakt: ein Datenbit pro Taktflanke", pin_LE: "Latch / Befehl: die Anzahl Takte während High wählt den Befehl", pin_LATCH: "Latch / Befehl: die Pulslänge wählt den Befehl", pin_LAT: "Latch / Befehl: unterschiedliche LAT-Längen bedeuten unterschiedliche Befehle",
   pin_OUT_sink: "Konstantstromausgang: nimmt den Strom einer LED-Spalte auf (Senke)", pin_OUT_source: "Konstantstromausgang: liefert Strom in eine LED-Spalte (Quelle)",
   pin_ROW: "Zeilenwechsel: sagt dem Chip, zur nächsten Zeile zu wechseln", pin_ST: "Scan Toggle: sagt dem Chip, zur nächsten Zeile zu wechseln", pin_BLANK: "Austastung beim Zeilenwechsel: schaltet die Ausgänge kurz ab",
   pin_SDO: "Serieller Datenausgang: weiter zum nächsten Chip (Kaskade)", pin_DOUT: "Serieller Datenausgang: weiter zum nächsten Chip (Kaskade)",
@@ -1371,7 +1765,7 @@ function renderICPage() {
   applyCommon();
   document.title = `${ic.id} · ${t("doc_suffix")}`;
   $("#icName").textContent = ic.id;
-  $("#products").innerHTML = ic.products.map((p) => `<span class="chip">${esc(p)}</span>`).join("");
+  $("#products").innerHTML = ic.products.map((p) => `<span class="chip">${esc(L(p))}</span>`).join("");
   $("#facts").innerHTML = ic.facts.map(([k, v]) => `<div class="fact"><span>${t(k)}</span><b>${esc(L(v))}</b></div>`).join("");
   $("#cards").innerHTML = t("cards").map(([title, f, e]) => `<div class="card"><h3>${title}</h3><div class="f">${f}</div><p class="e">${e}</p></div>`).join("") +
     (t("warn_t") !== "warn_t" ? `<div class="card warn"><h3>${t("warn_t")}</h3><p class="e">${t("warn_e")}</p></div>` : "");
@@ -1380,11 +1774,13 @@ function renderICPage() {
   $("#steps").innerHTML = t("inside").map((n) => `<li>${n}</li>`).join("");
   $("#appSteps").innerHTML = t("app").map((n) => `<li>${n}</li>`).join("");
   $("#legCur").textContent = t(`leg_${ic.drive}`);
-  $("#icnav").innerHTML = IC_INDEX.map((x) => `<a href="ic-${x.id}.html"${x.id === ic.id ? ' aria-current="page"' : ""}>${x.id}<span>${x.products.join(" · ")}</span></a>`).join("");
+  $("#icnav").innerHTML = IC_INDEX.map((x) => `<a href="ic-${x.id}.html"${x.id === ic.id ? ' aria-current="page"' : ""}>${x.id}<span>${x.products.map(L).join(" · ")}</span></a>`).join("");
   drawApp($("#appSvg"), ic);
   drawBlock($("#blockSvg"), ic);
   $("#ccSec").classList.toggle("hidden", !ic.curve);
-  if (ic.curve) { drawCurve($("#curveSvg"), ic); setupCalc(ic); }
+  if (ic.curve) drawCurve($("#curveSvg"), ic);
+  $(".calc").classList.toggle("hidden", !ic.calc);
+  if (ic.calc) setupCalc(ic);
   $("#xmSec").classList.toggle("hidden", !ic.xm);
   if (ic.xm) drawXm(ic);
   listeners.forEach((fn) => fn());
@@ -1407,7 +1803,7 @@ zh: {
   ov_h_ics: "每颗芯片", ov_k_ch: "通道", ov_k_scan: "扫描", ov_k_cur: "电流", ov_k_acc: "精度", ov_k_pkg: "封装", ov_open: "查看 →",
   ov_h_cmp: "放在一起比一比", ov_p_cmp: "数据来自各自的规格书（XM11206G 为预览版）。不同芯片的定位不同，数字大不一定就更好——比如行列一体芯片的电流是按小间距灯珠设计的。",
   cmp_ch: "每颗芯片的通道数", cmp_scan: "最大扫描数", cmp_cur: "单路最大电流 (mA)", cmp_acc: "通道间电流误差（最大，%，越小越好）",
-  ov_notes: ["数据来源：各芯片规格书和 Xm-Plus 产品介绍，详见每颗芯片页面的“说明”。", "FOLDSTER（TBS5267）和 INSTALLED（ICND1069）没有规格书，暂未收录。", "“优势”是根据规格书的解读，不是实测结果。", "部分资料标注为保密——本网站仅限公司内部使用，请勿外传。"],
+  ov_notes: ["数据来源：各芯片规格书和 Xm-Plus 产品介绍，详见每颗芯片页面的“说明”。", "INSTALLED（ICND1069）还没有规格书，暂未收录。", "“优势”是根据规格书的解读，不是实测结果。", "部分资料标注为保密——本网站仅限公司内部使用，请勿外传。"],
 },
 en: {
   ov_back: "← How LED displays work", ov_kicker: "LED driver IC library", ov_h1: "The LED driver ICs in our products",
@@ -1424,7 +1820,7 @@ en: {
   ov_h_ics: "Each chip", ov_k_ch: "Channels", ov_k_scan: "Scan", ov_k_cur: "Current", ov_k_acc: "Accuracy", ov_k_pkg: "Package", ov_open: "Open →",
   ov_h_cmp: "Side by side", ov_p_cmp: "Figures come from each datasheet (XM11206G is preliminary). The chips target different uses, so a bigger number isn't always better – the integrated chips' currents, for example, are sized for fine-pitch LEDs.",
   cmp_ch: "Channels per chip", cmp_scan: "Maximum scans", cmp_cur: "Max. current per channel (mA)", cmp_acc: "Channel-to-channel current error (max., %, lower is better)",
-  ov_notes: ["Sources: each chip's datasheet and the Xm-Plus product introduction; see the notes on each chip page.", "FOLDSTER (TBS5267) and INSTALLED (ICND1069) have no datasheet yet and are not included.", "The strengths are an interpretation of the datasheets, not measurements.", "Some material is marked confidential – this site is for internal use only; please don't share it outside the company."],
+  ov_notes: ["Sources: each chip's datasheet and the Xm-Plus product introduction; see the notes on each chip page.", "INSTALLED (ICND1069) has no datasheet yet and is not included.", "The strengths are an interpretation of the datasheets, not measurements.", "Some material is marked confidential – this site is for internal use only; please don't share it outside the company."],
 },
 de: {
   ov_back: "← So funktioniert ein LED-Display", ov_kicker: "Bibliothek der LED-Treiber-ICs", ov_h1: "Die LED-Treiber-ICs in unseren Produkten",
@@ -1441,15 +1837,18 @@ de: {
   ov_h_ics: "Die einzelnen Chips", ov_k_ch: "Kanäle", ov_k_scan: "Scan", ov_k_cur: "Strom", ov_k_acc: "Genauigkeit", ov_k_pkg: "Gehäuse", ov_open: "Öffnen →",
   ov_h_cmp: "Im Vergleich", ov_p_cmp: "Die Werte stammen aus den Datenblättern (XM11206G vorläufig). Die Chips zielen auf unterschiedliche Einsätze – eine größere Zahl ist nicht automatisch besser; die Ströme der integrierten Chips etwa sind für Fine-Pitch-LEDs ausgelegt.",
   cmp_ch: "Kanäle pro Chip", cmp_scan: "Maximale Scans", cmp_cur: "Max. Strom pro Kanal (mA)", cmp_acc: "Stromabweichung zwischen Kanälen (max., %, kleiner ist besser)",
-  ov_notes: ["Quellen: die Datenblätter der Chips und die Xm-Plus-Produktvorstellung; siehe Hinweise auf jeder Chipseite.", "FOLDSTER (TBS5267) und INSTALLED (ICND1069) haben noch kein Datenblatt und sind nicht enthalten.", "Die Stärken sind eine Auslegung der Datenblätter, keine Messwerte.", "Ein Teil des Materials ist vertraulich gekennzeichnet – diese Website ist nur für den internen Gebrauch; bitte nicht weitergeben."],
+  ov_notes: ["Quellen: die Datenblätter der Chips und die Xm-Plus-Produktvorstellung; siehe Hinweise auf jeder Chipseite.", "INSTALLED (ICND1069) hat noch kein Datenblatt und ist nicht enthalten.", "Die Stärken sind eine Auslegung der Datenblätter, keine Messwerte.", "Ein Teil des Materials ist vertraulich gekennzeichnet – diese Website ist nur für den internen Gebrauch; bitte nicht weitergeben."],
 },
 };
 for (const l of Object.keys(OV)) Object.assign(COMMON[l], OV[l]);
 
 // 产品 → 芯片（包括没有规格书的两个）
+const FOLD = (zh, en, de) => ({ zh: `FOLDSTER ${zh}`, en: `FOLDSTER ${en}`, de: `FOLDSTER ${de}` });
 const PRODUCTS = [
   ["AVORA", "ICND2055S"], ["MERI", "ICND2055S"], ["Jupiter", "ICND2069"], ["VENUS", "ICND2069", "ICND2069EA"], ["ARUNA", "ICND2169"], ["AURA", "CFD955B"],
-  ["LUGH", "MBI5264"], ["LEDGend", "XM10480G"], ["ENKI", "XM10480G"], ["WINGSTER", "XM11206G"], ["FOLDSTER", null, "TBS5267"], ["INSTALLED", null, "ICND1069"],
+  ["LUGH", "MBI5264"], ["LEDGend", "XM10480G"], ["ENKI", "XM10480G"], ["WINGSTER", "XM11206G"],
+  [FOLD("outdoor P1.8", "outdoor P1.8", "Outdoor P1.8"), "TBS5267A"], [FOLD("indoor P1.5", "indoor P1.5", "Indoor P1.5"), "DP3370S"], [FOLD("indoor P1.8", "indoor P1.8", "Indoor P1.8"), "ICND1065L"],
+  ["INSTALLED", null, "ICND1069"],
 ];
 // 对比用的数值（出自各规格书；最大电流取最高供电电压下的值）
 const CMP = {
@@ -1458,6 +1857,9 @@ const CMP = {
   ICND2169: { ch: 16, scan: 64, cur: 18, acc: 2, pkg: "SSOP24 · QFN24", shape: "sop" },
   CFD955B: { ch: 16, scan: 64, cur: 35, acc: 2, pkg: "QSOP24", shape: "sop" },
   MBI5264: { ch: 16, scan: 64, cur: 20, acc: 2.5, pkg: "SSOP24 · QFN24", shape: "sop" },
+  TBS5267A: { ch: 16, scan: 64, cur: 20, acc: 1.5, pkg: "SSOP24 · QFN24", shape: "sop" },
+  DP3370S: { ch: 16, scan: 64, cur: 36, acc: 2, pkg: "QSOP24 · QFN24", shape: "sop" },
+  ICND1065L: { ch: 16, scan: 64, cur: 30, acc: 2, pkg: "SSOP24", shape: "sop" },
   XM10480G: { ch: 48, scan: 80, cur: 15, acc: 2, pkg: "QFN88", shape: "qfn" },
   XM11206G: { ch: 120, scan: 48, cur: 7.5, acc: 1, pkg: "BGA208", shape: "bga" },
 };
@@ -1518,14 +1920,14 @@ function renderOverview() {
   const byId = Object.fromEntries(IC_ALL.map((ic) => [ic.id, ic]));
   $("#map").innerHTML = `<tr><th>${t("ov_th_product")}</th><th>${t("ov_th_ic")}</th><th>${t("ov_th_maker")}</th><th>${t("ov_th_drive")}</th></tr>` +
     PRODUCTS.map(([p, id, alias]) => {
-      if (!id) return `<tr><td>${p}</td><td class="mono">${alias}</td><td></td><td class="none">${t("ov_none")}</td></tr>`;
+      if (!id) return `<tr><td>${L(p)}</td><td class="mono">${alias}</td><td></td><td class="none">${t("ov_none")}</td></tr>`;
       const ic = byId[id];
-      return `<tr><td>${p}</td><td><a href="ic-${id}.html">${alias || id}</a></td><td>${ic.maker}</td><td><span class="tag ${ic.drive}">${t(`drive_${ic.drive}`)}</span></td></tr>`;
+      return `<tr><td>${L(p)}</td><td><a href="ic-${id}.html">${alias || id}</a></td><td>${ic.maker}</td><td><span class="tag ${ic.drive}">${t(`drive_${ic.drive}`)}</span></td></tr>`;
     }).join("");
   $("#concepts").innerHTML = conceptSvgs().map(([h, p, svg]) => `<div class="concept">${svg}<h3>${t(h)}</h3><p>${t(p)}</p></div>`).join("");
   $("#icgrid").innerHTML = IC_ALL.map((ic) => {
     const c = CMP[ic.id];
-    return `<a class="iccard" href="ic-${ic.id}.html">${pkgSvg(c.shape)}<div class="mk">${ic.maker}</div><h3>${ic.id}</h3><div class="pr">${t("used_in")} ${ic.products.join(" · ")}</div>
+    return `<a class="iccard" href="ic-${ic.id}.html">${pkgSvg(c.shape)}<div class="mk">${ic.maker}</div><h3>${ic.id}</h3><div class="pr">${t("used_in")} ${ic.products.map(L).join(" · ")}</div>
       <span class="tag ${ic.drive}">${t(`drive_${ic.drive}`)}</span>
       <dl style="margin-top:10px"><dt>${t("ov_k_ch")}</dt><dd>${c.ch}</dd><dt>${t("ov_k_scan")}</dt><dd>${c.scan}</dd><dt>${t("ov_k_cur")}</dt><dd>≤ ${c.cur} mA</dd><dt>${t("ov_k_acc")}</dt><dd>±${c.acc} %</dd><dt>${t("ov_k_pkg")}</dt><dd>${c.pkg}</dd></dl>
       <div style="margin-top:10px;font-size:13px;color:var(--strong)">${t("ov_open")}</div></a>`;

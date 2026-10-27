@@ -1,0 +1,1345 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ICND1065L · LED Driver IC</title>
+<style>
+:root{
+  --page:#f2f2ef;--card:#fbfbfa;--text:#57575a;--strong:#18181a;--muted:#8c8c90;--line:#dcdcdc;--line2:#b4b4b8;
+  --accent:#e5372b;--accent-soft:#e5372b14;--data:#3e63dd;--good:#30a46c;--warn:#c27a00;
+  --viewer:#e8e8e4;--mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  --shadow:0 0 0 1px #0000000f,0 1px 1px -.5px #0000000a,0 6px 12px -6px #00000014;
+}
+html[data-theme="dark"]{
+  --page:#0b0b0b;--card:#131313;--text:#a3a3a3;--strong:#e6e6e6;--muted:#6e6e6e;--line:#262626;--line2:#3e3e3e;
+  --accent:#ff5a4f;--accent-soft:#ff5a4f1f;--data:#6b9bff;--good:#6be0a0;--warn:#ffb340;
+  --viewer:#0e0f12;--shadow:0 0 0 1px #ffffff0d;
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+html[data-theme="dark"]{color-scheme:dark}
+body{margin:0;background:var(--page);color:var(--text);font:15px/1.7 ui-sans-serif,system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
+main{width:min(980px,100% - 32px);margin:0 auto;padding:64px 0 96px}
+a{color:inherit}
+b,strong{color:var(--strong);font-weight:600}
+h1{margin:0;font:650 clamp(34px,6vw,52px)/1.05 var(--mono);color:var(--strong);letter-spacing:-.01em}
+h2{margin:56px 0 8px;font-size:21px;color:var(--strong);font-weight:650}
+h3{margin:0 0 4px;font-size:16px;color:var(--strong);font-weight:650}
+p{margin:0 0 10px}
+.top{position:fixed;top:14px;right:16px;display:flex;gap:8px;z-index:20}
+.top button,.back{font:11px var(--mono);letter-spacing:.06em;background:var(--card);color:var(--text);border:1px solid var(--line2);padding:6px 10px;cursor:pointer;text-decoration:none}
+.langs{display:flex}.langs button+button{border-left:none}
+.langs button[aria-pressed="true"]{background:var(--strong);color:var(--card);border-color:var(--strong)}
+.back{position:fixed;top:14px;left:16px;z-index:20}
+.kicker{font:12px var(--mono);letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.sub{font-size:18px;color:var(--strong);margin:10px 0 14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:22px}
+.chips .lbl{font-size:13px;color:var(--muted)}
+.chip{font:600 12px var(--mono);letter-spacing:.06em;padding:4px 10px;border:1px solid var(--line2);color:var(--strong);background:var(--card)}
+.facts{display:grid;grid-template-columns:repeat(6,1fr);gap:1px;background:var(--line);box-shadow:0 0 0 1px var(--line)}
+.fact{background:var(--card);padding:12px 14px;min-width:0}
+.fact span{display:block;font-size:12px;color:var(--muted)}
+.fact b{display:block;font:600 16px/1.35 var(--mono);overflow-wrap:anywhere}
+.oneliner{margin:22px 0 0;padding:14px 18px;background:var(--accent-soft);color:var(--strong);font-size:16px}
+/* 3D */
+.viewer{position:relative;margin-top:14px;background:var(--viewer);box-shadow:var(--shadow);overflow:hidden}
+.stage{height:clamp(380px,64vh,620px);touch-action:none}
+.stage canvas{display:block;width:100%;height:100%}
+.tools{position:absolute;top:12px;left:12px;right:12px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+.tools button{pointer-events:auto;font:12px ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif;padding:6px 12px;border:1px solid #ffffff2a;background:#151618cc;color:#e6e6e6;cursor:pointer;backdrop-filter:blur(6px)}
+html[data-theme="light"] .tools button{background:#ffffffd9;color:#18181a;border-color:#00000018}
+.tools button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+.tools .sep{flex:1}
+.legend{position:absolute;left:12px;bottom:12px;display:grid;gap:4px;font-size:12px;color:#e6e6e6;background:#151618b3;padding:8px 10px;backdrop-filter:blur(6px);max-width:min(460px,100% - 24px);pointer-events:none}
+html[data-theme="light"] .legend{background:#ffffffcc;color:#18181a}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:7px;vertical-align:1px}
+.legend .cur{background:#ff8a3d;box-shadow:0 0 6px #ff8a3d}.legend .dat{background:#4d8bff;box-shadow:0 0 6px #4d8bff}
+.tip{position:absolute;pointer-events:none;max-width:280px;font-size:12.5px;line-height:1.45;padding:7px 10px;background:#151618ee;color:#f2f2f2;border:1px solid #ffffff22;transform:translate(14px,14px);opacity:0;transition:opacity .12s}
+.tip b{color:#fff}
+.status{position:absolute;inset:0;display:grid;place-items:center;font-size:14px;color:var(--muted);text-align:center;padding:24px}
+.note3d{font-size:12.5px;color:var(--muted);margin-top:8px}
+/* 图 */
+figure{margin:16px 0 0}
+.fig{background:var(--card);box-shadow:var(--shadow);padding:14px}
+.fig svg{display:block;width:100%;height:auto;font-family:ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:8px}
+.two{display:grid;grid-template-columns:1.15fr 1fr;gap:28px;align-items:start}
+.steps{margin:0;padding-left:20px}.steps li{margin:8px 0}
+svg .box{fill:var(--card);stroke:var(--line2);stroke-width:1.2}
+svg .box.hi{stroke:var(--strong);stroke-width:1.6}
+svg .lbl{fill:var(--strong);font-size:12px}
+svg .sm{fill:var(--muted);font-size:10.5px}
+svg .mono{font-family:var(--mono)}
+svg .wire{fill:none;stroke:var(--line2);stroke-width:1.3}
+svg .flow{fill:none;stroke-width:2;stroke-dasharray:4 10;animation:flow 1.1s linear infinite}
+svg .flow.d{stroke:var(--data)}svg .flow.c{stroke:var(--accent)}
+@keyframes flow{to{stroke-dashoffset:-28}}
+svg .grid{stroke:var(--line);stroke-width:1}
+svg .axis{stroke:var(--line2);stroke-width:1}
+svg .band{fill:var(--accent-soft)}
+@media (prefers-reduced-motion:reduce){svg .flow{animation:none}}
+/* 计算器 */
+.calc{background:var(--card);box-shadow:var(--shadow);padding:16px 18px}
+.calc label{display:grid;grid-template-columns:1fr auto;gap:2px 10px;font-size:13px;margin:10px 0}
+.calc input{grid-column:1/-1;accent-color:var(--accent)}
+.calc output{font:600 13px var(--mono);color:var(--strong)}
+.result{display:flex;align-items:baseline;gap:10px;margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
+.result .n{font:650 30px/1 var(--mono);color:var(--strong)}
+.result .warn{font-size:12.5px;color:var(--warn)}
+.formula{font:13px var(--mono);color:var(--strong)}
+/* 卡片 */
+.cards{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:14px}
+.card{background:var(--card);box-shadow:var(--shadow);padding:16px 18px}
+.card .f{font:12px var(--mono);color:var(--muted);margin:2px 0 8px}
+.card .e{margin:0;color:var(--text)}
+.card.warn{grid-column:1/-1;box-shadow:inset 3px 0 0 var(--warn),var(--shadow)}
+/* 表 */
+table.specs{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);box-shadow:var(--shadow);margin-top:12px}
+.specs td{padding:9px 14px;border-top:1px solid var(--line);vertical-align:top}
+.specs tr:first-child td{border-top:none}
+.specs td:first-child{width:34%;color:var(--muted)}
+.specs td:last-child{font-family:var(--mono);font-size:13px;color:var(--strong)}
+.notes{font-size:13.5px;color:var(--muted);padding-left:18px}
+@media (max-width:820px){.facts{grid-template-columns:repeat(3,1fr)}.two{grid-template-columns:1fr}.cards{grid-template-columns:1fr}}
+@media (max-width:480px){.facts{grid-template-columns:repeat(2,1fr)}.back{display:none}main{padding-top:56px}}
+/* 其他 IC 导航 */
+.icnav{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.icnav a{font:600 12px var(--mono);letter-spacing:.04em;padding:7px 12px;border:1px solid var(--line2);background:var(--card);color:var(--strong);text-decoration:none}
+.icnav a[aria-current="page"]{background:var(--strong);color:var(--card);border-color:var(--strong)}
+.icnav a span{font-weight:400;color:var(--muted);margin-left:6px}
+.icnav a[aria-current="page"] span{color:var(--card);opacity:.7}
+/* 表格（刷新率配置等） */
+table.grid{width:100%;border-collapse:collapse;font-size:13.5px;background:var(--card);box-shadow:var(--shadow);margin-top:12px}
+.grid th,.grid td{padding:8px 12px;border-top:1px solid var(--line);text-align:right;font-family:var(--mono);white-space:nowrap}
+.grid th{color:var(--muted);font:600 12px ui-sans-serif,system-ui,"Microsoft YaHei",sans-serif;text-align:right;border-top:none}
+.grid th:first-child,.grid td:first-child{text-align:left}
+.grid tr.hl td{color:var(--strong);background:var(--accent-soft)}
+.scroll{overflow-x:auto}
+/* 功耗对比柱状图 */
+.bars{display:grid;gap:10px;margin-top:12px;background:var(--card);box-shadow:var(--shadow);padding:16px 18px}
+.bar-row{display:grid;grid-template-columns:minmax(120px,38%) 1fr;gap:12px;align-items:center;font-size:13px}
+.bar-track{height:26px;background:var(--line);position:relative}
+.bar-fill{height:100%;background:var(--accent);display:flex;align-items:center;justify-content:flex-end;padding-right:8px;color:#fff;font:600 12px var(--mono);transition:width .9s cubic-bezier(.32,.72,0,1)}
+.bar-fill.alt{background:var(--muted)}
+.hidden{display:none!important}
+.lede{font-size:16px;margin:0 0 4px}
+/* 总览页 */
+.map{width:100%;border-collapse:collapse;font-size:14px;background:var(--card);box-shadow:var(--shadow);margin-top:12px}
+.map td,.map th{padding:9px 14px;border-top:1px solid var(--line);text-align:left}
+.map th{border-top:none;color:var(--muted);font-weight:600;font-size:12.5px}
+.map td:first-child{font:600 13px var(--mono);color:var(--strong)}
+.map a{font:600 13px var(--mono);color:var(--strong)}
+.map .none{color:var(--muted);font-size:13px}
+.tag{display:inline-block;font:600 11px var(--mono);padding:2px 7px;border:1px solid var(--line2);margin-right:4px}
+.tag.sink{border-color:var(--warn);color:var(--warn)}
+.tag.source{border-color:var(--good);color:var(--good)}
+.tag.integrated{border-color:var(--data);color:var(--data)}
+.icgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-top:14px}
+.iccard{display:block;background:var(--card);box-shadow:var(--shadow);padding:16px 18px;text-decoration:none;color:inherit;transition:transform .2s cubic-bezier(.32,.72,0,1)}
+.iccard:hover{transform:translateY(-2px)}
+.iccard h3{font:650 20px var(--mono);margin:6px 0 2px}
+.iccard .mk{font:12px var(--mono);color:var(--muted)}
+.iccard .pr{font-size:13px;margin:6px 0 10px}
+.iccard dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0;font-size:12.5px}
+.iccard dt{color:var(--muted)}.iccard dd{margin:0;font-family:var(--mono);color:var(--strong)}
+.iccard svg{display:block;width:100%;height:84px}
+.concepts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+.concept{background:var(--card);box-shadow:var(--shadow);padding:14px 16px}
+.concept svg{display:block;width:100%;height:auto;margin-bottom:8px}
+.concept p{font-size:13.5px;margin:6px 0 0}
+.cmp{display:grid;gap:18px;margin-top:12px}
+.cmp h3{font-size:14px;margin-bottom:6px}
+@media (max-width:820px){.concepts{grid-template-columns:1fr}}
+
+.pk-link{display:block;margin:14px 0 0;padding:12px 16px;background:var(--card);box-shadow:var(--shadow);color:var(--text);text-decoration:none;font-size:14.5px}
+.pk-link:hover{box-shadow:0 0 0 1px var(--strong)}
+.two:has(.calc.hidden){grid-template-columns:1fr}
+
+</style>
+</head>
+<body>
+<a class="back" href="ics.html" data-i18n="back"></a>
+<div class="top"><div class="langs" role="group" aria-label="Language"><button type="button" data-lang="zh">中文</button><button type="button" data-lang="en">EN</button><button type="button" data-lang="de">DE</button></div><button type="button" class="theme-btn"></button></div>
+
+<main>
+  <div class="kicker" data-i18n="kicker"></div>
+  <h1 id="icName"></h1>
+  <div class="sub" data-i18n="subtitle"></div>
+  <div class="chips"><span class="lbl" data-i18n="used_in"></span><span id="products" style="display:contents"></span></div>
+  <div class="facts" id="facts"></div>
+  <p class="oneliner" data-i18n="oneliner"></p>
+
+  <h2 data-i18n="h_3d"></h2>
+  <p data-i18n="p_3d"></p>
+  <div class="viewer" id="viewer">
+    <div class="stage"></div>
+    <div class="status" data-i18n="loading"></div>
+    <div class="tools" hidden>
+      <button type="button" data-act="xray" aria-pressed="false" data-i18n="b_xray"></button>
+      <button type="button" data-act="current" aria-pressed="true" data-i18n="b_current"></button>
+      <button type="button" data-act="slow" aria-pressed="false" data-i18n="b_slow"></button>
+      <span class="sep"></span>
+      <button type="button" data-act="view-close" data-i18n="b_close"></button>
+      <button type="button" data-act="view-all" data-i18n="b_all"></button>
+    </div>
+    <div class="legend" hidden><span><i class="cur"></i><span id="legCur"></span></span><span><i class="dat"></i><span data-i18n="leg_dat"></span></span></div>
+    <div class="tip"></div>
+  </div>
+  <p class="note3d" data-i18n="note_3d"></p>
+  <a class="pk-link" href="packages.html" data-i18n="pk_link"></a>
+
+  <h2 data-i18n="h_app"></h2>
+  <div class="two">
+    <div>
+      <p data-i18n="p_app"></p>
+      <ul class="steps" id="appSteps"></ul>
+    </div>
+    <figure><div class="fig"><svg id="appSvg" viewBox="0 0 460 330" role="img"></svg></div><figcaption data-i18n="cap_app"></figcaption></figure>
+  </div>
+
+  <h2 data-i18n="h_inside"></h2>
+  <figure><div class="fig"><svg id="blockSvg" viewBox="0 0 680 300" role="img"></svg></div><figcaption data-i18n="cap_block"></figcaption></figure>
+  <ol class="steps" id="steps"></ol>
+
+  <section id="ccSec">
+    <h2 data-i18n="h_cc"></h2>
+    <p data-i18n="p_cc"></p>
+    <div class="two">
+      <figure><div class="fig"><svg id="curveSvg" viewBox="0 0 460 290" role="img"></svg></div><figcaption data-i18n="cap_curve"></figcaption></figure>
+      <div class="calc">
+        <h3 data-i18n="h_calc"></h3>
+        <div class="formula" id="calcFormula"></div>
+        <label><span data-i18n="l_rext"></span><output id="oR"></output><input id="iR" type="range" min="0" max="1000" value="420"></label>
+        <label><span id="lGain"></span><output id="oG"></output><input id="iG" type="range"></label>
+        <div class="result"><span data-i18n="l_res"></span><span class="n" id="oI"></span><span class="warn" id="oW"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="xmSec">
+    <h2 data-i18n="h_xm"></h2>
+    <p data-i18n="p_xm"></p>
+    <div class="xm-body"></div>
+  </section>
+
+  <h2 data-i18n="h_adv"></h2>
+  <div class="cards" id="cards"></div>
+
+  <h2 data-i18n="h_specs"></h2>
+  <table class="specs" id="specs"></table>
+
+  <h2 data-i18n="h_notes"></h2>
+  <ul class="notes" id="notes"></ul>
+
+  <h2 data-i18n="others"></h2>
+  <nav class="icnav" id="icnav"></nav>
+</main>
+
+<script>
+const IC_ALL = [];
+const registerIC = (ic) => IC_ALL.push(ic);
+const IC_INDEX = [{"id": "ICND2055S", "products": ["AVORA", "MERI"], "maker": "Chipone", "drive": "sink"}, {"id": "ICND2069", "products": ["Jupiter", "VENUS"], "maker": "Chipone", "drive": "source"}, {"id": "ICND2169", "products": ["ARUNA"], "maker": "Chipone", "drive": "source"}, {"id": "CFD955B", "products": ["AURA"], "maker": "Chipfountain", "drive": "source"}, {"id": "MBI5264", "products": ["LUGH"], "maker": "Macroblock", "drive": "sink"}, {"id": "XM10480G", "products": ["LEDGend", "ENKI"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "XM11206G", "products": ["WINGSTER"], "maker": "Xm-Plus", "drive": "integrated"}, {"id": "TBS5267A", "products": [{"zh": "FOLDSTER 户外 P1.8", "en": "FOLDSTER outdoor P1.8", "de": "FOLDSTER Outdoor P1.8"}], "maker": "TBSILICON", "drive": "source"}, {"id": "DP3370S", "products": [{"zh": "FOLDSTER 户内 P1.5", "en": "FOLDSTER indoor P1.5", "de": "FOLDSTER Indoor P1.5"}], "maker": "Depu Micro", "drive": "sink"}, {"id": "ICND1065L", "products": [{"zh": "FOLDSTER 户内 P1.8", "en": "FOLDSTER indoor P1.8", "de": "FOLDSTER Indoor P1.8"}], "maker": "Chipone", "drive": "sink"}];
+// ---------- Xm-Plus 资料里的公共数据（Xm-Plus Product Introduction, Jun 2024） ----------
+// GEN2 刷新率配置表
+const XM_REFRESH_TABLE = [
+  { refresh: 3840, frame: 60, scramble: "6b (64)", pwm: "12b", total: "18b", scan: 32, onDuty: 79.0 },
+  { refresh: 3840, frame: 120, scramble: "5b (32)", pwm: "11b", total: "16b", scan: 48, onDuty: 65.0 },
+  { refresh: 7680, frame: 60, scramble: "7b (128)", pwm: "11b", total: "18b", scan: 26, onDuty: 67.0 },
+  { refresh: 7680, frame: 480, scramble: "4b (16)", pwm: "12b", total: "16b", scan: 16, onDuty: 79.8 },
+  { refresh: 15360, frame: 240, scramble: "6b (64)", pwm: "12b", total: "18b", scan: 8, onDuty: 80.0 },
+];
+// 功耗对比案例：P2.8 箱体（500 × 500 mm，176RGB × 176），模组 250 × 250 mm（88RGB × 88）。数据来自终端客户。
+const XM_POWER_CASE = {
+  a: { label: { zh: "XM10486G（共阴，行列一体）", en: "XM10486G (common cathode, integrated)", de: "XM10486G (gem. Kathode, integriert)" }, ics: { zh: "每模组 48 颗芯片", en: "48 chips per module", de: "48 Chips pro Modul" }, current: 720 },
+  b: { label: { zh: "MBI5264 + 行驱动（共阳）", en: "MBI5264 + scan driver (common anode)", de: "MBI5264 + Zeilentreiber (gem. Anode)" }, ics: { zh: "每模组 198 + 22 颗芯片", en: "198 + 22 chips per module", de: "198 + 22 Chips pro Modul" }, current: 3000, approx: true },
+};
+
+// ICND1065L · Chipone · FOLDSTER 户内 P1.8 · 来源：ICND1065L datasheet V1.0 (Oct 2024)
+registerIC({
+  id: "ICND1065L", maker: "Chipone", products: [{"zh": "FOLDSTER 户内 P1.8", "en": "FOLDSTER indoor P1.8", "de": "FOLDSTER Indoor P1.8"}], drive: "sink",
+  facts: [["f_ch", "16"], ["f_scan", "1 : 64"], ["f_cur", "0.5–30 mA"], ["f_acc", "±2 % max"], ["f_pkg", "SSOP24"], ["f_drive", { zh: "灌电流 · 共阳", en: "Sink · common anode", de: "Senke · gem. Anode" }]],
+  scene: {
+    pkg: "sop24", pins: ["GND", "SDI", "DCLK", "LE", ...Array.from({ length: 16 }, (_, i) => `OUT${i}`), "ROW", "SDO", "REXT", "VDD"],
+    data: ["SDI", "DCLK", "LE"], vias: ["GND", "SDI", "DCLK", "LE", "ROW", "SDO"], rext: "REXT",
+    mark: [{ text: "CHIPONE", size: 150, weight: 700 }, { text: "ICND1065L", size: 170 }, { text: "LOT NO.", size: 100, weight: 500 }],
+    led: { base: 0x2a0a08, glow: 0xff1a0a },
+    die: { blocks: ["SHIFT REG", "SRAM", "PLL", "STATE / MBIST", "CURRENT REG", "COMPARATORS ×16"], out: "16 × CONSTANT-CURRENT OUTPUT" },
+  },
+  app: { rowIC: "ICND2018", rows: 63 },
+  block: {
+    A: { zh: "16 位移位寄存器", en: "16-bit shift register", de: "16-Bit-Schieberegister" },
+    B: { zh: "SRAM（整帧数据）", en: "SRAM (whole frame)", de: "SRAM (ganzes Bild)" },
+    C: "PLL → GCLK",
+    D: { zh: "数据处理 / GCLK 计数", en: "Data processing / GCLK counter", de: "Datenverarbeitung / GCLK-Zähler" },
+    E: { zh: "LE 计数 / 配置寄存器", en: "LE counter / config register", de: "LE-Zähler / Konfiguration" },
+    F: { zh: "比较器 × 16", en: "Comparators × 16", de: "Komparatoren × 16" },
+    G: { zh: "恒流输出 OUT0–15", en: "Constant-current outputs", de: "Konstantstromausgänge" },
+    H: { zh: "电流调节器", en: "Current regulator", de: "Stromregler" },
+    I: { zh: "LED 开路检测", en: "LED open detection", de: "LED-Unterbrechungserkennung" },
+    J: { zh: "预充电（去鬼影）", en: "Pre-charge (anti-ghosting)", de: "Vorladung (Anti-Ghosting)" },
+    pins: { a: "SDI", c: "DCLK", e: "LE / ROW", h: "REXT", out: "SDO" },
+    led: { zh: "16 列 LED", en: "16 LED columns", de: "16 LED-Spalten" },
+  },
+  curve: { currents: [5, 15, 25], vmax: 1.8, imax: 30, rec: [0.4, 1.0] },
+  calc: { k: 18, gain: [50, 200, 1, 100], r: [0.5, 40], range: [0.5, 30], formula: { zh: "规格书公式：Iout = 18 ÷ Rext(kΩ) × 增益（50–200 %）", en: "Datasheet formula: Iout = 18 ÷ Rext(kΩ) × gain (50–200 %)", de: "Formel aus dem Datenblatt: Iout = 18 ÷ Rext(kΩ) × Verstärkung (50–200 %)" } },
+  text: {
+    zh: {
+      kicker: "驱动 IC · Chipone 集创北方", subtitle: "16 通道 PWM 恒流灌电流 LED 驱动（1 : 64）",
+      oneliner: "<b>一句话：</b>FOLDSTER 户内 P1.8 用的共阳驱动。可以看成 AVORA / MERI 那颗 ICND2055S 的“64 扫加强版”：同一家厂、同样的引脚，扫描数翻倍、电流更大。",
+      note_3d: "外形按规格书尺寸建模（SSOP24-P-150-0.635）；芯片内部结构为示意。示例中驱动 16 列红色 LED，电流从 LED 负极被“吸”进 OUT 引脚（共阳）。",
+      p_app: "这是规格书里的典型 1:64 扫描电路，简化后的样子：",
+      app: ["<b>行驱动 ICND2018</b>（左）：8 颗 ICND2018 一起管 64 行，轮流给某一行 LED 的<b>正极（阳极）</b>通电——共阳。", "<b>ICND1065L</b>（下）：每颗管 16 列，红、绿、蓝各一颗，从 LED <b>负极</b>把电流“吸”进来——<b>灌电流</b>。", "<b>控制器</b>把红、绿、蓝数据分别送进各自的 SDI，DCLK / LE / ROW 共用；多颗芯片 SDO → SDI 串起来。"],
+      cap_app: "简化自 ICND1065L 规格书 “Application Information”。为看清楚只画了 6 行 × 12 列。",
+      inside: ["<b>收数据：</b>SDI 上的灰度数据随 DCLK（最高 20 MHz）一位一位移进 16 位移位寄存器。", "<b>存起来：</b>经地址映射存进片内 SRAM——64 行一整帧都存得下，扫描时不用重发。", "<b>数节拍：</b>内部 PLL 从 DCLK 生成灰度时钟 GCLK（5 V 下最高 80 MHz），GCLK 计数器跟着数。", "<b>比较：</b>每一路比较器拿计数值和灰度值比——没到就开，到了就关（PWM）。低灰时用“插帧算法”提高刷新率。", "<b>恒流输出：</b>电流调节器按 REXT 和增益稳住电流；预充电电路去鬼影，开路检测单元发现坏灯。芯片还带自检（MBIST）。"],
+      cap_block: "简化自规格书框图。蓝线是数据，红线是 LED 电流。",
+      p_cc: "只要输出端电压超过很低的“拐点”，电流就基本不变，每颗 LED 亮度一致。规格书推荐把输出电压 VDS 控制在 <b>0.4–1.0 V</b>（浅红区域），太高的电压只会变成热——这时可以降低 LED 供电，或串一个电阻 / 稳压管分压。",
+      cap_curve: "曲线形状参照规格书（VDD = 5 V，5 / 15 / 25 mA）。鼠标移上去看数值。",
+      cards: [
+        ["暗场更干净", "Noise Free™ 降噪 + 低灰偏色、不均匀优化", "低灰下电流也稳定，PCB 串扰被压住 → 暗部没有偏色和“马赛克”。"],
+        ["低灰也有高刷新", "插帧算法提高低灰刷新率", "暗画面拍屏也不容易出现扫描线。"],
+        ["整屏亮度均匀", "通道间、芯片间误差都 ≤ ±2 %（典型 ±1.25 %）", "模组、箱体拼在一起不容易“花屏”；还专门处理了模组间色差。"],
+        ["黑底白字更利落", "消除首行偏暗、高对比耦合", "高对比边缘干净，第一行不比别的行暗。"],
+        ["坏一颗灯，不拖一串", "单颗 LED 开路检测和反馈（防“毛毛虫”）", "一颗灯断路时，同列其他灯不会被带着微微亮成一条线，控制系统还能读到坏点位置。"],
+        ["没有鬼影", "集成预充电电路", "亮的内容下方不会出现淡淡的“残影”。"],
+        ["电流更大、扫描更多", "0.5–30 mA，1 : 64 扫（ICND2055S：25 mA，1 : 32）", "同一家族里能带更多行、更大的灯珠；8 位增益 50–200 % 方便调白平衡。"],
+        ["省电", "动态节能", "画面暗或全黑时降低芯片自身耗电。"],
+      ],
+      warn_t: "需要注意",
+      warn_e: "共阳：红、绿、蓝共用一个电源电压，红灯多出来的电压在芯片上变成热。这颗芯片只有 SSOP24 一种封装（热阻 64 °C/W），P1.8 灯板上要注意散热。规格书没有给出灰度位数和刷新率，所以本页不写这两项。",
+      specs: [
+        ["厂商", "Chipone Technology (Beijing)"], ["驱动方式", "16 路恒流灌电流（共阳）"], ["扫描", "1 : 64"],
+        ["输出电流", "0.5–30 mA × 16 @ VDD 5 V\n0.5–20 mA × 16 @ VDD 4.2 V\n0.5–15 mA × 16 @ VDD 3.3 V"], ["电流精度（通道间 / 芯片间）", "±1.25 % typ · ±2.0 % max"],
+        ["电流增益", "50–200 %（50–100 % 步进 1.5625 %，100–200 % 步进 3.125 %）"], ["电流公式", "Iout = 18 ÷ Rext × Gain"], ["供电 VDD", "3.3–5.5 V"],
+        ["数据时钟 DCLK", "≤ 20 MHz"], ["灰度时钟 GCLK", "内部 PLL，≤ 80 MHz（5 V）/ 75 MHz（3.3 V）"], ["输出上升 / 下降时间", "50 ns / 35 ns（5 V）"],
+        ["芯片电流", "4.3 mA（输出开）· 2.6 mA（输出关）@ 5 V"], ["封装", "SSOP24（0.635 mm）"], ["最大功耗 / 热阻（25 °C）", "1.98 W（64 °C/W，4 层板）"],
+        ["工作温度", "−40 … +85 °C"], ["配套行驱动", "ICND2018"],
+      ],
+      notes: ["数据来源：ICND1065L datasheet V1.0（2024 年 10 月）。", "规格书没有直接给出灰度位数和刷新率，所以本页不写这两项。", "“优势”和“对屏幕的意义”是根据规格书的解读，不是实测结果。", "内部资料，请勿外传。"],
+    },
+    en: {
+      kicker: "Driver IC · Chipone", subtitle: "16-channel PWM constant-current LED sink driver (1 : 64)",
+      oneliner: "<b>In one sentence:</b> the common-anode driver in FOLDSTER indoor P1.8. Think of it as the “64-scan big brother” of the ICND2055S in AVORA / MERI: same maker, same pinout, twice the scan lines and more current.",
+      note_3d: "Package modelled to datasheet dimensions (SSOP24-P-150-0.635); the inside is an illustration. In this example it drives 16 columns of red LEDs; the current is pulled from the LED cathodes into the OUT pins (common anode).",
+      p_app: "The typical 1:64 scan circuit from the datasheet, simplified:",
+      app: ["<b>Row driver ICND2018</b> (left): eight ICND2018 together handle 64 rows, powering the <b>anodes</b> of one row at a time – common anode.", "<b>ICND1065L</b> (bottom): each handles 16 columns, one chip each for red, green and blue, pulling current in from the LED <b>cathodes</b> – a <b>sink</b> driver.", "The <b>controller</b> sends red, green and blue data to their own SDI; DCLK / LE / ROW are shared; chips chain SDO → SDI."],
+      cap_app: "Simplified from the ICND1065L datasheet, “Application Information”. Only 6 rows × 12 columns are drawn for clarity.",
+      inside: ["<b>Receive data:</b> grayscale data on SDI shifts into a 16-bit shift register, one bit per DCLK (up to 20 MHz).", "<b>Store it:</b> via the address mapping unit into on-chip SRAM – a whole 64-row frame fits, so nothing is resent while scanning.", "<b>Count the beat:</b> an internal PLL makes the grayscale clock GCLK (up to 80 MHz at 5 V) from DCLK; the GCLK counter counts along.", "<b>Compare:</b> each channel's comparator checks the count against its grayscale value – below, on; reached, off (PWM). At low grayscale a frame-insertion algorithm raises the refresh rate.", "<b>Constant current:</b> the current regulator holds the current set by REXT and the gain; a pre-charge circuit removes ghosting and the open-detection unit finds dead LEDs. The chip also has a built-in self-test (MBIST)."],
+      cap_block: "Simplified from the datasheet block diagram. Blue = data, red = LED current.",
+      p_cc: "Once the output voltage passes a low “knee”, the current is essentially fixed, so every LED is equally bright. The datasheet recommends VDS = <b>0.4–1.0 V</b> (pale red band); more voltage just turns into heat – lower the LED supply or drop the surplus over a resistor / Zener diode.",
+      cap_curve: "Curve shapes follow the datasheet (VDD = 5 V, 5 / 15 / 25 mA). Hover to read values.",
+      cards: [
+        ["Cleaner dark scenes", "Noise Free™ + fixes for low-gray colour shift and non-uniformity", "Current stays stable at low grayscale and PCB crosstalk is suppressed → shadows without tint or blotches."],
+        ["High refresh at low grayscale", "Frame-insertion algorithm", "Dark pictures don't show scan lines on camera either."],
+        ["Even brightness across the wall", "≤ ±2 % between channels and chips (±1.25 % typ)", "Modules and cabinets don't look patchy; colour differences between modules are addressed too."],
+        ["Crisp text on black", "Fixes the dim first scan line and high-contrast coupling", "Clean high-contrast edges; the first row isn't darker."],
+        ["One dead LED stays one dead LED", "Individual LED open detection and feedback (anti-“caterpillar”)", "The rest of the column doesn't glow faintly, and the control system can read where the dead pixel is."],
+        ["No ghosting", "Integrated pre-charge circuit", "No faint trail below bright content."],
+        ["More current, more scan lines", "0.5–30 mA, 1 : 64 (ICND2055S: 25 mA, 1 : 32)", "Drives more rows and bigger LEDs within the same family; 8-bit gain 50–200 % for white balance."],
+        ["Saves power", "Dynamic power saving", "Cuts the chip's own consumption on dark or black pictures."],
+      ],
+      warn_t: "Keep in mind",
+      warn_e: "Common anode: red, green and blue share one supply voltage and red's surplus turns into heat in the chip. This chip only comes as SSOP24 (64 °C/W), so watch the cooling on the P1.8 LED board. The datasheet gives neither grayscale bit depth nor refresh rate, so this page leaves them out.",
+      specs: [
+        ["Manufacturer", "Chipone Technology (Beijing)"], ["Drive", "16 constant-current sinks (common anode)"], ["Scan", "1 : 64"],
+        ["Output current", "0.5–30 mA × 16 @ VDD 5 V\n0.5–20 mA × 16 @ VDD 4.2 V\n0.5–15 mA × 16 @ VDD 3.3 V"], ["Current accuracy (channel / chip)", "±1.25 % typ · ±2.0 % max"],
+        ["Current gain", "50–200 % (1.5625 % steps up to 100 %, 3.125 % above)"], ["Current formula", "Iout = 18 ÷ Rext × Gain"], ["Supply VDD", "3.3–5.5 V"],
+        ["Data clock DCLK", "≤ 20 MHz"], ["Grayscale clock GCLK", "internal PLL, ≤ 80 MHz (5 V) / 75 MHz (3.3 V)"], ["Output rise / fall time", "50 ns / 35 ns (5 V)"],
+        ["Chip current", "4.3 mA (outputs on) · 2.6 mA (off) @ 5 V"], ["Package", "SSOP24 (0.635 mm)"], ["Max. power / thermal resistance (25 °C)", "1.98 W (64 °C/W, 4-layer PCB)"],
+        ["Operating temperature", "−40 … +85 °C"], ["Paired row driver", "ICND2018"],
+      ],
+      notes: ["Source: ICND1065L datasheet V1.0 (October 2024).", "The datasheet doesn't state grayscale bit depth or refresh rate, so this page leaves them out.", "The strengths and their effect on the screen are an interpretation of the datasheet, not measurements.", "Internal – please don't share outside the company."],
+    },
+    de: {
+      kicker: "Treiber-IC · Chipone", subtitle: "16-Kanal-PWM-Konstantstrom-LED-Treiber, Stromsenke (1 : 64)",
+      oneliner: "<b>In einem Satz:</b> der Treiber mit gemeinsamer Anode im FOLDSTER Indoor P1.8. Quasi der „große Bruder mit 64 Scans“ des ICND2055S aus AVORA / MERI: gleicher Hersteller, gleiche Pinbelegung, doppelt so viele Scanzeilen und mehr Strom.",
+      note_3d: "Gehäuse nach Datenblattmaßen modelliert (SSOP24-P-150-0.635); das Innere ist eine Illustration. Im Beispiel treibt der Chip 16 Spalten roter LEDs; der Strom wird von den Kathoden in die OUT-Pins gezogen (gemeinsame Anode).",
+      p_app: "Die typische 1:64-Scan-Schaltung aus dem Datenblatt, vereinfacht:",
+      app: ["<b>Zeilentreiber ICND2018</b> (links): acht ICND2018 versorgen zusammen 64 Zeilen, jeweils die <b>Anoden</b> einer Zeile – gemeinsame Anode.", "<b>ICND1065L</b> (unten): je Chip 16 Spalten, je ein Chip für Rot, Grün und Blau; er zieht den Strom von den <b>Kathoden</b> ab – <b>Stromsenke</b>.", "Der <b>Controller</b> schickt Rot-, Grün- und Blaudaten an das jeweilige SDI; DCLK / LE / ROW sind gemeinsam; Chips sind über SDO → SDI verkettet."],
+      cap_app: "Vereinfacht nach dem ICND1065L-Datenblatt, „Application Information“. Zur Übersicht nur 6 Zeilen × 12 Spalten.",
+      inside: ["<b>Daten empfangen:</b> Graustufendaten auf SDI werden mit DCLK (bis 20 MHz) Bit für Bit in ein 16-Bit-Schieberegister geschoben.", "<b>Speichern:</b> über die Adresszuordnung ins On-Chip-SRAM – ein ganzes Bild mit 64 Zeilen passt hinein.", "<b>Takt zählen:</b> eine interne PLL erzeugt aus DCLK den Graustufentakt GCLK (bis 80 MHz bei 5 V), der GCLK-Zähler zählt mit.", "<b>Vergleichen:</b> der Komparator jedes Kanals vergleicht Zählerstand und Graustufenwert – darunter an, erreicht aus (PWM). Bei niedrigen Graustufen erhöht ein Bild-Einfüge-Algorithmus die Wiederholrate.", "<b>Konstantstrom:</b> der Stromregler hält den über REXT und Verstärkung eingestellten Strom; eine Vorladeschaltung verhindert Geisterbilder, die Unterbrechungserkennung findet defekte LEDs. Dazu ein eingebauter Selbsttest (MBIST)."],
+      cap_block: "Vereinfacht nach dem Blockschaltbild im Datenblatt. Blau = Daten, Rot = LED-Strom.",
+      p_cc: "Sobald die Ausgangsspannung ein niedriges „Knie“ überschreitet, ist der Strom praktisch fest – alle LEDs leuchten gleich hell. Das Datenblatt empfiehlt VDS = <b>0,4–1,0 V</b> (hellroter Bereich); mehr wird nur zu Wärme – dann die LED-Versorgung senken oder den Überschuss an einem Widerstand / einer Z-Diode abfallen lassen.",
+      cap_curve: "Kurvenform nach dem Datenblatt (VDD = 5 V, 5 / 15 / 25 mA). Mit der Maus Werte ablesen.",
+      cards: [
+        ["Sauberere dunkle Szenen", "Noise Free™ + gegen Farbstich und Ungleichmäßigkeit bei niedrigen Graustufen", "Der Strom bleibt auch bei niedrigen Graustufen stabil, PCB-Übersprechen wird unterdrückt → Schatten ohne Farbstich oder Flecken."],
+        ["Hohe Rate auch bei Dunkel", "Bild-Einfüge-Algorithmus", "Auch dunkle Bilder zeigen vor der Kamera keine Scanlinien."],
+        ["Gleichmäßige Helligkeit", "≤ ±2 % zwischen Kanälen und Chips (±1,25 % typ)", "Module und Kabinette wirken nicht fleckig; Farbunterschiede zwischen Modulen werden ebenfalls behandelt."],
+        ["Klarer Text auf Schwarz", "Gegen dunkle erste Scanzeile und Kopplung bei hohem Kontrast", "Saubere Kontrastkanten; die erste Zeile ist nicht dunkler."],
+        ["Eine defekte LED bleibt eine", "Erkennung einzelner offener LEDs mit Rückmeldung (gegen „Raupen“)", "Der Rest der Spalte glimmt nicht mit, und das Steuersystem kann die Position des Defekts auslesen."],
+        ["Keine Geisterbilder", "Integrierte Vorladeschaltung", "Unter hellen Inhalten erscheint keine schwache Spur."],
+        ["Mehr Strom, mehr Scanzeilen", "0,5–30 mA, 1 : 64 (ICND2055S: 25 mA, 1 : 32)", "Mehr Zeilen und größere LEDs in derselben Familie; 8-Bit-Verstärkung 50–200 % für den Weißabgleich."],
+        ["Spart Energie", "Dynamisches Energiesparen", "Senkt den Eigenverbrauch bei dunklem oder schwarzem Bild."],
+      ],
+      warn_t: "Zu beachten",
+      warn_e: "Gemeinsame Anode: Rot, Grün und Blau teilen sich eine Versorgungsspannung, der Überschuss für Rot wird im Chip zu Wärme. Den Chip gibt es nur als SSOP24 (64 °C/W) – auf der P1.8-Platine auf die Kühlung achten. Das Datenblatt nennt weder Graustufen-Bittiefe noch Bildwiederholrate, daher fehlen sie hier.",
+      specs: [
+        ["Hersteller", "Chipone Technology (Beijing)"], ["Ansteuerung", "16 Konstantstromsenken (gemeinsame Anode)"], ["Scan", "1 : 64"],
+        ["Ausgangsstrom", "0,5–30 mA × 16 @ VDD 5 V\n0,5–20 mA × 16 @ VDD 4,2 V\n0,5–15 mA × 16 @ VDD 3,3 V"], ["Stromgenauigkeit (Kanal / Chip)", "±1,25 % typ · ±2,0 % max"],
+        ["Stromverstärkung", "50–200 % (bis 100 % in 1,5625-%-Schritten, darüber 3,125 %)"], ["Stromformel", "Iout = 18 ÷ Rext × Gain"], ["Versorgung VDD", "3,3–5,5 V"],
+        ["Datentakt DCLK", "≤ 20 MHz"], ["Graustufentakt GCLK", "interne PLL, ≤ 80 MHz (5 V) / 75 MHz (3,3 V)"], ["Anstiegs- / Abfallzeit", "50 ns / 35 ns (5 V)"],
+        ["Chipstrom", "4,3 mA (Ausgänge an) · 2,6 mA (aus) @ 5 V"], ["Gehäuse", "SSOP24 (0,635 mm)"], ["Max. Verlustleistung / Wärmewiderstand (25 °C)", "1,98 W (64 °C/W, 4-Lagen-Platine)"],
+        ["Betriebstemperatur", "−40 … +85 °C"], ["Passender Zeilentreiber", "ICND2018"],
+      ],
+      notes: ["Quelle: ICND1065L-Datenblatt V1.0 (Oktober 2024).", "Das Datenblatt nennt weder Graustufen-Bittiefe noch Bildwiederholrate, daher fehlen sie hier.", "Die Stärken und ihre Wirkung auf den Bildschirm sind eine Auslegung des Datenblatts, keine Messwerte.", "Intern – bitte nicht außerhalb des Unternehmens weitergeben."],
+    },
+  },
+});
+
+// ---------- IC 页面公用：文案、语言/主题、图表 ----------
+// 每个 IC 页面先 registerIC(...)，再加载本文件。IC 是当前页面的芯片（总览页为 null）。
+const COMMON = {
+zh: {
+  back: "← 全部驱动 IC", doc_suffix: "LED 驱动 IC",
+  pk_link: "<b>封装对比</b>：SSOP、QFN、BGA 有什么不同？哪种好修、哪种散热好 →", used_in: "用于", others: "其他驱动 IC",
+  f_ch: "通道", f_scan: "扫描", f_cur: "单路电流", f_acc: "电流精度", f_pkg: "封装", f_drive: "驱动方式", f_gray: "灰度", f_refresh: "刷新率",
+  h_3d: "拿在手里看一看",
+  p_3d: "拖动旋转、滚轮缩放，鼠标移到引脚或器件上可以看到它的作用。打开“透视内部”能看到芯片里的硅片和金线。<b>橙色光点</b>是流过 LED 的电流，<b>蓝色光点</b>是数据。",
+  loading: "正在加载 3D 模型…", fail: "3D 模型需要联网加载 three.js，当前无法加载。其余内容不受影响。",
+  b_xray: "透视内部", b_current: "电流流动", b_slow: "慢放", b_close: "芯片特写", b_all: "整体",
+  leg_sink: "LED 电流：从行电源流过 LED，进入 OUT 引脚，穿过芯片从 GND 流出",
+  leg_source: "LED 电流：从 VDD 进入芯片，经 OUT 引脚流出，穿过 LED 到行开关（阴极）",
+  leg_integrated: "LED 电流：从数据引脚（阳极）流出，穿过当前行的 LED，经扫描引脚（阴极）回到芯片",
+  leg_dat: "数据：串行数据和时钟",
+  pin: "引脚",
+  pin_GND: "地：电流从这里流出芯片", pin_SDI: "串行数据输入：灰度数据一位一位送进来", pin_SIN: "串行数据输入：灰度数据一位一位送进来", pin_DIN: "串行数据输入：灰度数据一位一位送进来",
+  pin_DCLK: "数据时钟：每个时钟边沿移入一位数据", pin_LE: "锁存 / 命令：高电平期间数几个时钟，就是哪条命令", pin_LATCH: "锁存 / 命令：用脉冲长度区分不同命令", pin_LAT: "锁存 / 命令：LAT 的长度不同，代表不同的命令",
+  pin_OUT_sink: "恒流输出：吸入一列 LED 的电流（灌电流）", pin_OUT_source: "恒流输出：向一列 LED 送出电流（拉电流）",
+  pin_ROW: "换行信号：告诉芯片换到下一行", pin_ST: "换行信号（Scan toggle）：告诉芯片换到下一行", pin_BLANK: "换行消隐：换行时先把输出关掉",
+  pin_SDO: "串行数据输出：传给下一颗芯片（级联）", pin_DOUT: "串行数据输出：传给下一颗芯片（级联）",
+  pin_REXT: "接一个外部电阻，设定 16 路电流的大小", pin_VDD: "电源",
+  pin_DATA: "数据驱动（阳极）：给一列 LED 的正极送恒流", pin_SCAN: "行扫描（阴极）：把一行 LED 的负极接到地",
+  pin_VSSLED: "LED 地：电流最后从这里回去", pin_VDDLEDH: "LED 电源（绿 / 蓝，约 3.8 V）", pin_VDDLEDL: "LED 电源（红，约 2.8 V，更省电）",
+  pin_PWR: "芯片电源 / 地", pin_IF: "SPI 接口：串行数据、时钟和片选", pin_CTRL: "控制 / 配置引脚",
+  t_die: "硅片（示意）：芯片的所有功能都在这块几平方毫米的硅上", t_wire: "金线：把硅片上的焊盘连到引脚", t_frame: "引线框架：引脚在封装内部的部分",
+  t_led1: "LED：亮度由占空比决定", t_pixel: "RGB 像素：红、绿、蓝三颗 LED 芯片封装在一起", t_rail_sink: "行电源（共阳）：由行驱动芯片接通", t_rail_source: "行开关（共阴）：由行驱动芯片接地",
+  t_row: "行线（阴极）：连到芯片的扫描引脚", t_col: "列线（阳极）：连到芯片的数据引脚",
+  t_rext: "REXT 电阻：决定电流大小", t_cap: "去耦电容：让电源保持稳定", t_body: "黑色环氧树脂封装，表面激光打标", t_via: "过孔：信号转到电路板背面继续走",
+  t_ball: "锡球：BGA 封装底部的焊接点", t_sub: "BGA 基板：一块小电路板，把硅片的焊盘引到底部的锡球", t_epad: "QFN 底部焊盘（VSSLED）：同时用来散热",
+  h_app: "它在屏里的什么位置", h_inside: "芯片里面怎么工作", h_cc: "什么是“恒流”", h_adv: "优势，以及它让屏幕变成什么样", h_specs: "规格一览", h_notes: "说明",
+  ax_x: "输出电压 VDS (V)", ax_y: "输出电流 (mA)", rec: "推荐区间",
+  h_calc: "电流计算器", l_rext: "电阻 Rext", l_gain: "增益", l_gcc: "增益码 GCC（6 位）", l_res: "每路电流", w_range: "超出规格书的电流范围",
+  d_ctrl: "控制器", d_row: "行驱动", d_rows: "第 0 … N 行", d_data: "数据", d_same: "同一颗芯片", d_scan: "扫描（阴极）", d_dataout: "数据（阳极）",
+  warn_label: "需要注意",
+  th_refresh: "刷新率 (Hz)", th_frame: "帧率 (Hz)", th_scramble: "打散位数", th_pwm: "PWM 位数", th_total: "总灰度位数", th_scan: "扫描数", th_duty: "LED 点亮占空比",
+},
+en: {
+  back: "← All driver ICs", doc_suffix: "LED driver IC",
+  pk_link: "<b>Packages compared</b>: how do SSOP, QFN and BGA differ? Which is easy to repair, which cools best →", used_in: "Used in", others: "Other driver ICs",
+  f_ch: "Channels", f_scan: "Scan", f_cur: "Current / channel", f_acc: "Accuracy", f_pkg: "Package", f_drive: "Drive", f_gray: "Grayscale", f_refresh: "Refresh",
+  h_3d: "Take a closer look",
+  p_3d: "Drag to rotate, scroll to zoom, hover a pin or part to see what it does. Switch on “X-ray” to see the silicon die and gold bond wires inside. <b>Orange dots</b> are LED current, <b>blue dots</b> are data.",
+  loading: "Loading 3D model…", fail: "The 3D model needs an internet connection to load three.js and couldn't load. The rest of the page still works.",
+  b_xray: "X-ray", b_current: "Current flow", b_slow: "Slow motion", b_close: "Close-up", b_all: "Overview",
+  leg_sink: "LED current: from the row supply through the LED into an OUT pin, through the chip, out of GND",
+  leg_source: "LED current: from VDD into the chip, out of an OUT pin, through the LED to the row switch (cathode)",
+  leg_integrated: "LED current: out of a data pin (anode), through the LEDs of the active row, back in through a scan pin (cathode)",
+  leg_dat: "Data: serial data and clock",
+  pin: "Pin",
+  pin_GND: "Ground: current leaves the chip here", pin_SDI: "Serial data in: grayscale data arrives bit by bit", pin_SIN: "Serial data in: grayscale data arrives bit by bit", pin_DIN: "Serial data in: grayscale data arrives bit by bit",
+  pin_DCLK: "Data clock: one data bit per clock edge", pin_LE: "Latch / command: the number of clocks while it is high selects the command", pin_LATCH: "Latch / command: the pulse length selects the command", pin_LAT: "Latch / command: different LAT lengths mean different commands",
+  pin_OUT_sink: "Constant-current output: sinks one LED column's current", pin_OUT_source: "Constant-current output: sources current into one LED column",
+  pin_ROW: "Row change: tells the chip to move to the next row", pin_ST: "Scan toggle: tells the chip to move to the next row", pin_BLANK: "Row-change blanking: switches outputs off while the row changes",
+  pin_SDO: "Serial data out: passes data on to the next chip (cascade)", pin_DOUT: "Serial data out: passes data on to the next chip (cascade)",
+  pin_REXT: "One external resistor sets the current of all 16 outputs", pin_VDD: "Supply",
+  pin_DATA: "Data driver (anode): sends constant current into one LED column", pin_SCAN: "Scan driver (cathode): connects one LED row to ground",
+  pin_VSSLED: "LED ground: the current returns here", pin_VDDLEDH: "LED supply (green / blue, about 3.8 V)", pin_VDDLEDL: "LED supply (red, about 2.8 V – saves power)",
+  pin_PWR: "Chip supply / ground", pin_IF: "SPI interface: serial data, clock and chip select", pin_CTRL: "Control / configuration pin",
+  t_die: "Silicon die (illustration): every function of the chip sits on a few square millimetres of silicon", t_wire: "Gold bond wire: connects a pad on the die to a pin", t_frame: "Lead frame: the part of each pin inside the package",
+  t_led1: "LED: brightness follows the duty cycle", t_pixel: "RGB pixel: red, green and blue LED chips in one package", t_rail_sink: "Row supply (common anode), switched on by the row driver", t_rail_source: "Row switch (common cathode), connected to ground by the row driver",
+  t_row: "Row line (cathode): goes to a scan pin of the chip", t_col: "Column line (anode): goes to a data pin of the chip",
+  t_rext: "REXT resistor: sets the current", t_cap: "Decoupling capacitor: keeps the supply steady", t_body: "Black epoxy mould compound, laser-marked", t_via: "Via: the signal continues on the back of the board",
+  t_ball: "Solder ball: a BGA package's connection underneath", t_sub: "BGA substrate: a tiny circuit board that routes the die's pads to the balls underneath", t_epad: "QFN exposed pad (VSSLED): also carries heat away",
+  h_app: "Where it sits in the display", h_inside: "How it works inside", h_cc: "What “constant current” means", h_adv: "Strengths – and what they do for the screen", h_specs: "Specifications", h_notes: "Notes",
+  ax_x: "Output voltage VDS (V)", ax_y: "Output current (mA)", rec: "recommended",
+  h_calc: "Current calculator", l_rext: "Resistor Rext", l_gain: "Gain", l_gcc: "Gain code GCC (6-bit)", l_res: "Current per channel", w_range: "outside the datasheet's current range",
+  d_ctrl: "Controller", d_row: "Row driver", d_rows: "Rows 0 … N", d_data: "Data", d_same: "the same chip", d_scan: "Scan (cathode)", d_dataout: "Data (anode)",
+  warn_label: "Keep in mind",
+  th_refresh: "Refresh (Hz)", th_frame: "Frame rate (Hz)", th_scramble: "Scramble bits", th_pwm: "PWM bits", th_total: "Total bits", th_scan: "Scans", th_duty: "LED on-duty",
+},
+de: {
+  back: "← Alle Treiber-ICs", doc_suffix: "LED-Treiber-IC",
+  pk_link: "<b>Gehäuse im Vergleich</b>: wie unterscheiden sich SSOP, QFN und BGA? Was ist leicht zu reparieren, was kühlt am besten →", used_in: "Verbaut in", others: "Weitere Treiber-ICs",
+  f_ch: "Kanäle", f_scan: "Scan", f_cur: "Strom / Kanal", f_acc: "Genauigkeit", f_pkg: "Gehäuse", f_drive: "Ansteuerung", f_gray: "Graustufen", f_refresh: "Wiederholrate",
+  h_3d: "Aus der Nähe betrachtet",
+  p_3d: "Ziehen zum Drehen, Mausrad zum Zoomen, über einen Pin oder ein Bauteil fahren zeigt seine Funktion. Mit „Röntgenblick“ siehst du den Siliziumchip und die Gold-Bonddrähte im Inneren. <b>Orange Punkte</b> sind LED-Strom, <b>blaue Punkte</b> Daten.",
+  loading: "3D-Modell wird geladen …", fail: "Das 3D-Modell braucht eine Internetverbindung (three.js) und konnte nicht geladen werden. Der Rest der Seite funktioniert.",
+  b_xray: "Röntgenblick", b_current: "Stromfluss", b_slow: "Zeitlupe", b_close: "Nahaufnahme", b_all: "Übersicht",
+  leg_sink: "LED-Strom: von der Zeilenversorgung durch die LED in einen OUT-Pin, durch den Chip, aus GND heraus",
+  leg_source: "LED-Strom: von VDD in den Chip, aus einem OUT-Pin, durch die LED zum Zeilenschalter (Kathode)",
+  leg_integrated: "LED-Strom: aus einem Daten-Pin (Anode), durch die LEDs der aktiven Zeile, über einen Scan-Pin (Kathode) zurück",
+  leg_dat: "Daten: serielle Daten und Takt",
+  pin: "Pin",
+  pin_GND: "Masse: hier verlässt der Strom den Chip", pin_SDI: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an", pin_SIN: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an", pin_DIN: "Serieller Dateneingang: Graustufendaten kommen Bit für Bit an",
+  pin_DCLK: "Datentakt: ein Datenbit pro Taktflanke", pin_LE: "Latch / Befehl: die Anzahl Takte während High wählt den Befehl", pin_LATCH: "Latch / Befehl: die Pulslänge wählt den Befehl", pin_LAT: "Latch / Befehl: unterschiedliche LAT-Längen bedeuten unterschiedliche Befehle",
+  pin_OUT_sink: "Konstantstromausgang: nimmt den Strom einer LED-Spalte auf (Senke)", pin_OUT_source: "Konstantstromausgang: liefert Strom in eine LED-Spalte (Quelle)",
+  pin_ROW: "Zeilenwechsel: sagt dem Chip, zur nächsten Zeile zu wechseln", pin_ST: "Scan Toggle: sagt dem Chip, zur nächsten Zeile zu wechseln", pin_BLANK: "Austastung beim Zeilenwechsel: schaltet die Ausgänge kurz ab",
+  pin_SDO: "Serieller Datenausgang: weiter zum nächsten Chip (Kaskade)", pin_DOUT: "Serieller Datenausgang: weiter zum nächsten Chip (Kaskade)",
+  pin_REXT: "Ein externer Widerstand legt den Strom aller 16 Ausgänge fest", pin_VDD: "Versorgung",
+  pin_DATA: "Datentreiber (Anode): liefert Konstantstrom in eine LED-Spalte", pin_SCAN: "Scan-Treiber (Kathode): verbindet eine LED-Zeile mit Masse",
+  pin_VSSLED: "LED-Masse: hier fließt der Strom zurück", pin_VDDLEDH: "LED-Versorgung (Grün / Blau, ca. 3,8 V)", pin_VDDLEDL: "LED-Versorgung (Rot, ca. 2,8 V – spart Energie)",
+  pin_PWR: "Chip-Versorgung / Masse", pin_IF: "SPI-Schnittstelle: serielle Daten, Takt und Chip-Select", pin_CTRL: "Steuer- / Konfigurations-Pin",
+  t_die: "Siliziumchip (Illustration): alle Funktionen des Chips auf wenigen mm² Silizium", t_wire: "Gold-Bonddraht: verbindet ein Pad auf dem Chip mit einem Pin", t_frame: "Leadframe: der Teil der Pins im Gehäuse",
+  t_led1: "LED: Helligkeit folgt dem Tastgrad", t_pixel: "RGB-Pixel: rote, grüne und blaue LED-Chips in einem Gehäuse", t_rail_sink: "Zeilenversorgung (gemeinsame Anode), geschaltet vom Zeilentreiber", t_rail_source: "Zeilenschalter (gemeinsame Kathode), vom Zeilentreiber auf Masse gelegt",
+  t_row: "Zeilenleitung (Kathode): geht zu einem Scan-Pin des Chips", t_col: "Spaltenleitung (Anode): geht zu einem Daten-Pin des Chips",
+  t_rext: "REXT-Widerstand: legt den Strom fest", t_cap: "Entkopplungskondensator: hält die Versorgung stabil", t_body: "Schwarze Epoxid-Pressmasse, lasermarkiert", t_via: "Durchkontaktierung: das Signal läuft auf der Rückseite weiter",
+  t_ball: "Lotkugel: Anschluss eines BGA-Gehäuses an der Unterseite", t_sub: "BGA-Substrat: eine winzige Leiterplatte, die die Chip-Pads zu den Lotkugeln führt", t_epad: "Freiliegendes QFN-Pad (VSSLED): leitet auch Wärme ab",
+  h_app: "Wo er im Display sitzt", h_inside: "So arbeitet er innen", h_cc: "Was „Konstantstrom“ bedeutet", h_adv: "Stärken – und was sie für den Bildschirm bedeuten", h_specs: "Technische Daten", h_notes: "Hinweise",
+  ax_x: "Ausgangsspannung VDS (V)", ax_y: "Ausgangsstrom (mA)", rec: "empfohlen",
+  h_calc: "Stromrechner", l_rext: "Widerstand Rext", l_gain: "Verstärkung", l_gcc: "Verstärkungscode GCC (6 Bit)", l_res: "Strom pro Kanal", w_range: "außerhalb des Strombereichs im Datenblatt",
+  d_ctrl: "Controller", d_row: "Zeilentreiber", d_rows: "Zeile 0 … N", d_data: "Daten", d_same: "derselbe Chip", d_scan: "Scan (Kathode)", d_dataout: "Daten (Anode)",
+  warn_label: "Zu beachten",
+  th_refresh: "Wiederholrate (Hz)", th_frame: "Bildrate (Hz)", th_scramble: "Scramble-Bits", th_pwm: "PWM-Bits", th_total: "Bits gesamt", th_scan: "Scans", th_duty: "LED-Einschaltdauer",
+},
+};
+const HTML_LANG = { zh: "zh-CN", en: "en", de: "de" };
+const IC = typeof IC_ALL !== "undefined" && IC_ALL.length === 1 ? IC_ALL[0] : null;
+
+// ---------- 语言 / 主题（与 LED 原理页共用设置） ----------
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+let LANG = (() => { const s = store.get("led-lang"); if (COMMON[s]) return s; const n = (navigator.language || "").toLowerCase(); return n.startsWith("de") ? "de" : n.startsWith("en") ? "en" : "zh"; })();
+let THEME = store.get("led-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+const listeners = [];
+// L：把 {zh, en, de} 这样的多语言值取成当前语言
+const L = (v) => (v && typeof v === "object" && !Array.isArray(v) && ("en" in v || "zh" in v) ? v[LANG] ?? v.en : v);
+const t = (key, ic = IC) => {
+  for (const src of [ic?.text?.[LANG], COMMON[LANG], ic?.text?.en, COMMON.en]) if (src && src[key] !== undefined) return src[key];
+  return key;
+};
+window.ICPAGE = { t, lang: () => LANG, theme: () => THEME, onChange: (fn) => listeners.push(fn), ic: IC };
+
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+
+function applyCommon() {
+  document.documentElement.lang = HTML_LANG[LANG];
+  document.documentElement.dataset.theme = THEME;
+  document.querySelectorAll("[data-i18n]").forEach((el) => (el.innerHTML = t(el.dataset.i18n)));
+  document.querySelectorAll(".langs button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
+  $(".theme-btn").textContent = THEME === "dark" ? "LIGHT" : "DARK";
+}
+function wireTopBar(render) {
+  $(".langs").addEventListener("click", (e) => { const b = e.target.closest("[data-lang]"); if (!b) return; LANG = b.dataset.lang; store.set("led-lang", LANG); render(); });
+  $(".theme-btn").addEventListener("click", () => { THEME = THEME === "dark" ? "light" : "dark"; store.set("led-theme", THEME); render(); });
+}
+
+// ---------- 图：应用电路 ----------
+let appTimer = 0;
+function drawApp(svg, ic) {
+  const kind = ic.drive, rows = 6, cols = 12, x0 = 120, y0 = 34, dx = 26, dy = 30;
+  const colColor = (c) => (c < 4 ? "#e5372b" : c < 8 ? "#2fa45f" : "#3e63dd");
+  const rowLbl = kind === "integrated" ? ic.id : ic.app?.rowIC || t("d_row");
+  const rowSub = kind === "integrated" ? t("d_scan") : ic.app?.rowIC ? t("d_row") : "";
+  let s = `<rect class="box${kind === "integrated" ? " hi" : ""}" x="10" y="20" width="78" height="${rows * dy + 14}"/><text class="lbl mono" x="49" y="${20 + (rows * dy + 14) / 2 - 6}" text-anchor="middle" font-size="${rowLbl.length > 9 ? 10 : 12}">${esc(rowLbl)}</text><text class="sm" x="49" y="${20 + (rows * dy + 14) / 2 + 10}" text-anchor="middle">${esc(rowSub)}</text>`;
+  for (let r = 0; r < rows; r++) s += `<line class="wire" data-row="${r}" x1="88" y1="${y0 + r * dy}" x2="${x0 + (cols - 1) * dx + 12}" y2="${y0 + r * dy}"/>`;
+  s += `<text class="sm" x="${x0 + (cols - 1) * dx + 12}" y="${y0 - 12}" text-anchor="end">${t("d_rows").replace("N", ic.app?.rows ?? "31")}</text>`;
+  // 共阳：三角形尖朝下（阳极在行线上）；共阴：三角形尖朝上（阴极在行线上）
+  const down = kind === "sink";
+  for (let c = 0; c < cols; c++) {
+    const x = x0 + c * dx;
+    s += `<line class="wire" x1="${x + 6}" y1="${y0 + 6}" x2="${x + 6}" y2="236"/>`;
+    for (let r = 0; r < rows; r++) {
+      const y = y0 + r * dy;
+      const tri = down ? `M${x - 5} ${y + 3}h10l-5 8z` : `M${x - 5} ${y + 11}h10l-5 -8z`;
+      const bar = down ? y + 12 : y + 2;
+      s += `<g data-led="${r}_${c}"><path d="${tri}" fill="${colColor(c)}" opacity=".28"/><line x1="${x - 5}" y1="${bar}" x2="${x + 5}" y2="${bar}" stroke="${colColor(c)}" stroke-width="1.4" opacity=".5"/><circle cx="${x}" cy="${y + 7}" r="7" fill="${colColor(c)}" opacity="0" class="glow"/></g>`;
+    }
+  }
+  if (kind === "integrated") {
+    s += `<rect class="box hi" x="${x0 - 8}" y="236" width="${12 * dx - 4}" height="42"/><text class="lbl mono" x="${x0 + 6 * dx - 6}" y="254" text-anchor="middle">${esc(ic.id)}</text><text class="sm" x="${x0 + 6 * dx - 6}" y="270" text-anchor="middle">${t("d_dataout")} R · G · B</text>`;
+    s += `<rect x="4" y="14" width="${x0 + 12 * dx}" height="270" fill="none" stroke="var(--data)" stroke-dasharray="5 5" rx="4"/><text class="sm" x="${x0 + 6 * dx}" y="298" text-anchor="middle" fill="var(--data)">${esc(ic.id)} = ${t("d_same")}</text>`;
+  } else {
+    ["R", "G", "B"].forEach((ch, i) => {
+      const x = x0 - 8 + i * 4 * dx;
+      s += `<rect class="box hi" x="${x}" y="236" width="${4 * dx - 4}" height="42"/><text class="lbl mono" x="${x + 2 * dx - 2}" y="254" text-anchor="middle" font-size="11">${esc(ic.id)}</text><text class="sm" x="${x + 2 * dx - 2}" y="270" text-anchor="middle" fill="${colColor(i * 4)}">${ch}</text>`;
+    });
+    s += `<rect class="box" x="10" y="250" width="78" height="40"/><text class="lbl" x="49" y="274" text-anchor="middle">${t("d_ctrl")}</text>`;
+    s += `<path class="flow d" d="M88 270 H${x0 - 14} V300 H${x0 + 12 * dx} V280"/><text class="sm" x="${x0 - 4}" y="316">${t("d_data")} (${ic.app?.chain || "SDI → SDO → SDI …"})</text>`;
+    s += `<path class="flow d" d="M49 250 V${20 + rows * dy + 14}"/>`;
+  }
+  svg.innerHTML = s;
+  clearInterval(appTimer);
+  let row = 0;
+  const lit = [[1,1,1,1,1,1,1,1,1,1,1,1],[0,1,1,0,1,0,0,1,1,1,0,1],[1,0,1,1,0,1,1,0,1,0,1,1],[1,1,0,1,1,1,0,1,0,1,1,0],[0,1,1,1,0,1,1,1,1,0,1,1],[1,0,1,0,1,1,0,1,1,1,0,1]];
+  const step = () => {
+    svg.querySelectorAll("[data-row]").forEach((l) => { const on = Number(l.dataset.row) === row; l.style.stroke = on ? "var(--strong)" : ""; l.style.strokeWidth = on ? "2.2" : ""; });
+    svg.querySelectorAll("[data-led]").forEach((g) => { const [r, c] = g.dataset.led.split("_").map(Number); const on = r === row && lit[r][c]; g.querySelector(".glow").style.opacity = on ? ".55" : "0"; g.querySelector("path").style.opacity = on ? "1" : ".28"; });
+    row = (row + 1) % rows;
+  };
+  step();
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) appTimer = setInterval(step, 650);
+}
+
+// ---------- 图：框图（固定 10 个格子，每颗芯片填自己的内容） ----------
+function drawBlock(svg, ic) {
+  const B = ic.block;
+  const box = (x, y, w, h, key, hi) => (B[key] ? `<rect class="box${hi ? " hi" : ""}" x="${x}" y="${y}" width="${w}" height="${h}" rx="2"/><text class="lbl" x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle">${esc(L(B[key]))}</text>` : "");
+  const pin = (x, y, name, anchor = "end") => (name ? `<text class="sm mono" x="${x}" y="${y + 4}" text-anchor="${anchor}">${esc(L(name))}</text>` : "");
+  let s = "";
+  s += box(70, 20, 170, 40, "A") + box(300, 20, 170, 40, "B") + box(70, 100, 170, 40, "C") + box(300, 100, 170, 40, "D");
+  s += box(70, 180, 170, 40, "E") + box(500, 100, 160, 40, "F", true) + box(500, 180, 160, 44, "G", true) + box(300, 180, 170, 40, "H", ic.drive === "integrated");
+  s += box(70, 248, 170, 34, "I") + box(300, 248, 170, 34, "J");
+  const P = B.pins || {};
+  s += pin(60, 40, P.a) + pin(60, 120, P.c) + pin(60, 200, P.e) + pin(385, 238, P.h, "middle") + pin(580, 20, P.out, "middle");
+  s += `<path class="wire" d="M240 40 H300 M470 40 H580 V100 M240 120 H300 M470 120 H500 M580 140 V180 M470 200 H500 M240 200 H270 V40"/>`;
+  if (P.h) s += `<path class="wire" d="M385 220 V230"/>`;
+  if (P.out) s += `<path class="wire" d="M580 30 V20"/>`;
+  s += `<path class="flow d" d="M64 40 H70 M240 40 H300 M470 40 H580 V100"/><path class="flow d" d="M64 120 H70 M240 120 H300 M470 120 H500"/>`;
+  s += `<path class="flow c" d="M580 224 V262 H660"/><text class="sm" x="664" y="266" text-anchor="end" dy="-10">${esc(L(B.led))}</text>`;
+  if (ic.drive === "integrated") s += `<path class="flow c" d="M470 200 H490"/>`;
+  svg.innerHTML = s;
+}
+
+// ---------- 图：恒流曲线 ----------
+function drawCurve(svg, ic) {
+  const C = ic.curve, vmax = C.vmax, imax = C.imax;
+  const X = (v) => 52 + (v / vmax) * 390, Y = (i) => 250 - (i / imax) * 222;
+  const knees = C.knees || C.currents.map((I) => 0.22 + I * 0.012);
+  const currents = C.knees ? C.knees.map(() => C.at) : C.currents;
+  const iAt = (k, v) => { const I = currents[k], knee = knees[k]; return v >= knee ? I * (1 + 0.004 * (v - knee)) : I * Math.sin((v / knee) * Math.PI / 2); };
+  let s = "";
+  if (C.rec) s += `<rect class="band" x="${X(C.rec[0])}" y="${Y(imax)}" width="${X(C.rec[1]) - X(C.rec[0])}" height="${Y(0) - Y(imax)}"/><text class="sm" x="${(X(C.rec[0]) + X(C.rec[1])) / 2}" y="${Y(imax) + 14}" text-anchor="middle">${t("rec")}</text>`;
+  const vstep = vmax > 1.5 ? 0.3 : 0.2, istep = imax > 25 ? 10 : 5;
+  for (let v = 0; v <= vmax + 1e-9; v += vstep) s += `<line class="grid" x1="${X(v)}" x2="${X(v)}" y1="${Y(0)}" y2="${Y(imax)}"/><text class="sm" x="${X(v)}" y="${Y(0) + 16}" text-anchor="middle">${v.toFixed(1)}</text>`;
+  for (let i = 0; i <= imax; i += istep) s += `<line class="grid" x1="${X(0)}" x2="${X(vmax)}" y1="${Y(i)}" y2="${Y(i)}"/><text class="sm" x="${X(0) - 8}" y="${Y(i) + 4}" text-anchor="end">${i}</text>`;
+  s += `<line class="axis" x1="${X(0)}" x2="${X(vmax)}" y1="${Y(0)}" y2="${Y(0)}"/><line class="axis" x1="${X(0)}" x2="${X(0)}" y1="${Y(0)}" y2="${Y(imax)}"/>`;
+  s += `<text class="sm" x="${X(vmax / 2)}" y="284" text-anchor="middle">${t("ax_x")}</text><text class="sm" x="14" y="${Y(imax / 2)}" transform="rotate(-90 14 ${Y(imax / 2)})" text-anchor="middle">${t("ax_y")}</text>`;
+  const shades = ["var(--line2)", "var(--muted)", "var(--text)", "var(--accent)"].slice(-currents.length);
+  currents.forEach((I, k) => {
+    let d = "";
+    for (let n = 0; n <= 90; n++) { const v = (n / 90) * vmax; d += `${n ? "L" : "M"}${X(v).toFixed(1)} ${Y(iAt(k, v)).toFixed(1)}`; }
+    const label = C.knees ? `${knees[k].toFixed(1)} V` : `${I} mA`;
+    const ly = C.knees ? Y(I) - 6 - (currents.length - 1 - k) * 0 : Y(I) - 6;
+    s += `<path d="${d}" fill="none" stroke="${shades[k]}" stroke-width="2"/>`;
+    s += C.knees ? `<text class="sm mono" x="${X(knees[k]) + 4}" y="${Y(I) + 16 + k * 12}">${label}</text>` : `<text class="sm mono" x="${X(vmax) - 2}" y="${ly}" text-anchor="end">${label}</text>`;
+  });
+  s += `<g class="hover" style="display:none"><line class="axis" y1="${Y(0)}" y2="${Y(imax)}" stroke-dasharray="3 3"/><text class="sm mono" y="${Y(imax) + 30}"></text></g><rect x="${X(0)}" y="${Y(imax)}" width="${X(vmax) - X(0)}" height="${Y(0) - Y(imax)}" fill="transparent" class="hit"/>`;
+  svg.innerHTML = s;
+  const hover = svg.querySelector(".hover"), line = hover.querySelector("line"), txt = hover.querySelector("text");
+  const hit = svg.querySelector(".hit");
+  hit.addEventListener("pointermove", (e) => {
+    const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY;
+    const q = p.matrixTransform(svg.getScreenCTM().inverse());
+    const v = Math.max(0, Math.min(vmax, ((q.x - 52) / 390) * vmax));
+    hover.style.display = ""; line.setAttribute("x1", X(v)); line.setAttribute("x2", X(v));
+    txt.setAttribute("x", Math.min(X(v) + 6, 290)); txt.textContent = `VDS ${v.toFixed(2)} V → ${currents.map((_, k) => iAt(k, v).toFixed(1)).join(" / ")} mA`;
+  });
+  hit.addEventListener("pointerleave", () => (hover.style.display = "none"));
+}
+
+// ---------- 电流计算器 ----------
+function setupCalc(ic) {
+  const C = ic.calc;
+  const iR = $("#iR"), iG = $("#iG");
+  iG.min = C.gain[0]; iG.max = C.gain[1]; iG.step = C.gain[2] || 1;
+  if (!iG.dataset.init) { iG.value = C.gain[3]; iR.value = C.r0 ?? 420; iG.dataset.init = "1"; }
+  const rFrom = (s) => C.r[0] * Math.pow(C.r[1] / C.r[0], s / 1000);
+  const run = () => {
+    const r = rFrom(Number(iR.value)), g = Number(iG.value);
+    const i = C.type === "gcc" ? (C.k * (17 + g)) / r : (C.k / r) * (g / 100);
+    $("#oR").textContent = `${r < 10 ? r.toFixed(2) : r.toFixed(1)} kΩ`;
+    $("#oG").textContent = C.type === "gcc" ? String(g) : `${g} %`;
+    $("#oI").textContent = `${i.toFixed(i < 10 ? 2 : 1)} mA`;
+    $("#oW").textContent = i < C.range[0] || i > C.range[1] ? t("w_range") : "";
+  };
+  $("#lGain").textContent = t(C.type === "gcc" ? "l_gcc" : "l_gain");
+  $("#calcFormula").textContent = L(C.formula);
+  iR.oninput = run; iG.oninput = run;
+  run();
+}
+
+// ---------- Xm-Plus：刷新率配置表、功耗对比 ----------
+function drawXm(ic) {
+  const X = ic.xm;
+  const wrap = $("#xmSec");
+  let h = "";
+  if (X.table) {
+    h += `<h3 style="margin-top:18px">${esc(L(X.tableTitle))}</h3><p>${L(X.tableText)}</p><div class="scroll"><table class="grid"><tr><th>${t("th_refresh")}</th><th>${t("th_frame")}</th><th>${t("th_scramble")}</th><th>${t("th_pwm")}</th><th>${t("th_total")}</th><th>${t("th_scan")}</th><th>${t("th_duty")}</th></tr>` +
+      XM_REFRESH_TABLE.map((r) => `<tr${r.refresh === 15360 ? ' class="hl"' : ""}><td>${r.refresh.toLocaleString("en")}</td><td>${r.frame}</td><td>${r.scramble}</td><td>${r.pwm}</td><td>${r.total}</td><td>${r.scan}</td><td>${r.onDuty.toFixed(1)} %</td></tr>`).join("") + `</table></div>`;
+  }
+  if (X.power) {
+    const P = XM_POWER_CASE, max = Math.max(P.a.current, P.b.current);
+    h += `<h3 style="margin-top:22px">${esc(L(X.powerTitle))}</h3><p>${L(X.powerText)}</p><div class="bars">` +
+      [[P.a, ""], [P.b, " alt"]].map(([c, cls]) => `<div class="bar-row"><span>${esc(L(c.label))}<br><small style="color:var(--muted)">${esc(L(c.ics))}</small></span><div class="bar-track"><div class="bar-fill${cls}" data-w="${(c.current / max) * 100}" style="width:0">${c.approx ? "≈ " : ""}${c.current >= 1000 ? (c.current / 1000).toFixed(0) + " A" : c.current + " mA"}</div></div></div>`).join("") + `</div>`;
+  }
+  wrap.querySelector(".xm-body").innerHTML = h;
+  requestAnimationFrame(() => wrap.querySelectorAll(".bar-fill").forEach((b) => (b.style.width = `${b.dataset.w}%`)));
+}
+
+// ---------- 单个 IC 页面 ----------
+function renderICPage() {
+  const ic = IC;
+  applyCommon();
+  document.title = `${ic.id} · ${t("doc_suffix")}`;
+  $("#icName").textContent = ic.id;
+  $("#products").innerHTML = ic.products.map((p) => `<span class="chip">${esc(L(p))}</span>`).join("");
+  $("#facts").innerHTML = ic.facts.map(([k, v]) => `<div class="fact"><span>${t(k)}</span><b>${esc(L(v))}</b></div>`).join("");
+  $("#cards").innerHTML = t("cards").map(([title, f, e]) => `<div class="card"><h3>${title}</h3><div class="f">${f}</div><p class="e">${e}</p></div>`).join("") +
+    (t("warn_t") !== "warn_t" ? `<div class="card warn"><h3>${t("warn_t")}</h3><p class="e">${t("warn_e")}</p></div>` : "");
+  $("#specs").innerHTML = t("specs").map(([k, v]) => `<tr><td>${k}</td><td>${esc(v).replace(/\n/g, "<br>")}</td></tr>`).join("");
+  $("#notes").innerHTML = t("notes").map((n) => `<li>${n}</li>`).join("");
+  $("#steps").innerHTML = t("inside").map((n) => `<li>${n}</li>`).join("");
+  $("#appSteps").innerHTML = t("app").map((n) => `<li>${n}</li>`).join("");
+  $("#legCur").textContent = t(`leg_${ic.drive}`);
+  $("#icnav").innerHTML = IC_INDEX.map((x) => `<a href="ic-${x.id}.html"${x.id === ic.id ? ' aria-current="page"' : ""}>${x.id}<span>${x.products.map(L).join(" · ")}</span></a>`).join("");
+  drawApp($("#appSvg"), ic);
+  drawBlock($("#blockSvg"), ic);
+  $("#ccSec").classList.toggle("hidden", !ic.curve);
+  if (ic.curve) drawCurve($("#curveSvg"), ic);
+  $(".calc").classList.toggle("hidden", !ic.calc);
+  if (ic.calc) setupCalc(ic);
+  $("#xmSec").classList.toggle("hidden", !ic.xm);
+  if (ic.xm) drawXm(ic);
+  listeners.forEach((fn) => fn());
+}
+
+wireTopBar(renderICPage);
+renderICPage();
+</script>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.0/examples/jsm/" } }
+</script>
+<script type="module">
+// ---------- 3D：按规格书尺寸建模的芯片 + 电路板 + 电流动画 ----------
+// 封装：sop24（SSOP24 / QSOP24）、qfn88、bga208。驱动：sink（共阳）、source（共阴）、integrated（行列一体）。
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const UI = window.ICPAGE;
+const IC = UI.ic;
+const CFG = IC.scene;
+const INTEGRATED = IC.drive === "integrated";
+const host = document.getElementById("viewer");
+const stage = host.querySelector(".stage");
+const tipEl = host.querySelector(".tip");
+const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 300);
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environmentIntensity = 0.55;
+const setBg = () => (scene.background = new THREE.Color(UI.theme() === "dark" ? 0x0e0f12 : 0xe8e8e4));
+setBg();
+
+const key = new THREE.DirectionalLight(0xffffff, 2.4);
+key.position.set(7, 16, 8);
+key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -18, right: 18, top: 18, bottom: -18, near: 1, far: 50 });
+key.shadow.bias = -0.0004;
+key.shadow.normalBias = 0.02;
+scene.add(key);
+const rim = new THREE.DirectionalLight(0xbcd2ff, 0.9);
+rim.position.set(-9, 6, -8);
+scene.add(rim);
+
+// ---------- 材质 ----------
+const M = {
+  mask: new THREE.MeshPhysicalMaterial({ color: 0x0c4a2e, roughness: 0.42, clearcoat: 0.6, clearcoatRoughness: 0.35 }),
+  trace: new THREE.MeshPhysicalMaterial({ color: 0x1d7447, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.3 }),
+  tin: new THREE.MeshStandardMaterial({ color: 0xdfe0e4, metalness: 1, roughness: 0.26 }),
+  solder: new THREE.MeshStandardMaterial({ color: 0xc8cad0, metalness: 1, roughness: 0.16 }),
+  epoxy: new THREE.MeshPhysicalMaterial({ color: 0x17181b, roughness: 0.62, clearcoat: 0.08, transparent: true, opacity: 1 }),
+  substrate: new THREE.MeshPhysicalMaterial({ color: 0x3a3220, roughness: 0.5, clearcoat: 0.4, transparent: true, opacity: 1 }),
+  dimple: new THREE.MeshStandardMaterial({ color: 0x0b0b0d, roughness: 0.22 }),
+  gold: new THREE.MeshStandardMaterial({ color: 0xffc35a, metalness: 1, roughness: 0.2 }),
+  frame: new THREE.MeshStandardMaterial({ color: 0xd0a37a, metalness: 1, roughness: 0.3 }),
+  silk: new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.85 }),
+  ledBody: new THREE.MeshStandardMaterial({ color: 0xf4f4f2, roughness: 0.35 }),
+  pixBody: new THREE.MeshStandardMaterial({ color: 0x1b1b1d, roughness: 0.4 }),
+  capBody: new THREE.MeshStandardMaterial({ color: 0x9a7a55, roughness: 0.6 }),
+  resBody: new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.5 }),
+  hole: new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 }),
+};
+const pickables = [];
+const add = (mesh, tip, opts = {}) => {
+  mesh.castShadow = opts.cast ?? true;
+  mesh.receiveShadow = true;
+  if (tip) { mesh.userData.tip = tip; pickables.push(mesh); }
+  (opts.parent || scene).add(mesh);
+  return mesh;
+};
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+const Y = 0.07; // 电流光点在走线上方的高度
+const segBox = (a, b, w, mat, y = 0.012, h = 0.025) => {
+  const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(len + w, h, w), mat);
+  m.position.set((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2);
+  m.rotation.y = -Math.atan2(b[1] - a[1], b[0] - a[0]);
+  return add(m, null, { cast: false });
+};
+const traceLine = (pts, w = 0.22, tip) => { for (let i = 1; i < pts.length; i++) { const m = segBox(pts[i - 1], pts[i], w, M.trace); if (tip) { m.userData.tip = tip; pickables.push(m); } } };
+const via = (x, z) => {
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.22, 0.04, 24), M.tin), "t_via", { cast: false }).position.set(x, 0.02, z);
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16), M.hole), null, { cast: false }).position.set(x, 0.025, z);
+};
+const chipPart = (x, z, w, d, h, bodyMat, tip) => {
+  add(new THREE.Mesh(new RoundedBoxGeometry(w * 0.62, h, d, 2, 0.04), bodyMat), tip).position.set(x, h / 2 + 0.03, z);
+  [-1, 1].forEach((e) => add(new THREE.Mesh(new RoundedBoxGeometry(w * 0.2, h + 0.02, d + 0.02, 2, 0.03), M.tin), tip).position.set(x + e * w * 0.41, h / 2 + 0.03, z));
+};
+class Poly {
+  constructor(pts) { this.pts = pts; this.cum = [0]; for (let i = 1; i < pts.length; i++) this.cum.push(this.cum[i - 1] + pts[i].distanceTo(pts[i - 1])); this.len = this.cum[this.cum.length - 1]; }
+  at(u, out) {
+    const d = (((u % 1) + 1) % 1) * this.len;
+    let i = 1;
+    while (i < this.cum.length - 1 && this.cum[i] < d) i++;
+    const t = (d - this.cum[i - 1]) / (this.cum[i] - this.cum[i - 1] || 1);
+    return out.copy(this.pts[i - 1]).lerp(this.pts[i], t);
+  }
+}
+
+// ---------- 纹理：激光打标、硅片 ----------
+function markingTexture(lines, w, h) {
+  const c = document.createElement("canvas");
+  c.width = 1600; c.height = Math.round((1600 * h) / w);
+  const g = c.getContext("2d");
+  g.fillStyle = "rgba(206,206,200,0.86)";
+  g.textAlign = "center";
+  const total = lines.reduce((s, l) => s + l.size * 1.25, 0);
+  let y = (c.height - total) / 2;
+  for (const l of lines) {
+    y += l.size * 1.12;
+    g.font = `${l.weight || 600} ${l.size}px ${l.font || "Arial, Helvetica, sans-serif"}`;
+    g.fillText(l.text, 800, y);
+    y += l.size * 0.13;
+  }
+  g.globalCompositeOperation = "destination-out"; // 激光打标的颗粒感
+  for (let i = 0; i < 26000; i++) { g.fillStyle = `rgba(0,0,0,${Math.random() * 0.5})`; g.fillRect(Math.random() * 1600, Math.random() * c.height, 2, 2); }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+function dieTexture(D) {
+  const W = 1300, H = INTEGRATED ? 1300 : 800, c = document.createElement("canvas");
+  c.width = W; c.height = H;
+  const g = c.getContext("2d");
+  g.fillStyle = "#3b3550"; g.fillRect(0, 0, W, H);
+  g.strokeStyle = "rgba(255,255,255,.05)";
+  for (let x = 0; x < W; x += 10) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+  const blk = (x, y, w, h, fill, label, cell) => {
+    g.fillStyle = fill; g.fillRect(x, y, w, h);
+    if (cell) { g.strokeStyle = "rgba(255,255,255,.12)"; for (let i = x; i < x + w; i += cell) { g.beginPath(); g.moveTo(i, y); g.lineTo(i, y + h); g.stroke(); } for (let j = y; j < y + h; j += cell) { g.beginPath(); g.moveTo(x, j); g.lineTo(x + w, j); g.stroke(); } }
+    g.strokeStyle = "rgba(255,255,255,.35)"; g.lineWidth = 3; g.strokeRect(x, y, w, h); g.lineWidth = 1;
+    g.fillStyle = "rgba(255,255,255,.85)"; g.font = "600 34px Arial"; g.textAlign = "center"; g.fillText(label, x + w / 2, y + h / 2 + 12);
+  };
+  const L = D.blocks;
+  if (!INTEGRATED) {
+    blk(110, 120, 330, 150, "#5a4a6e", L[0], 18);
+    blk(480, 120, 420, 300, "#41557a", L[1], 12);
+    blk(940, 120, 250, 150, "#6a5a3e", L[2], 0);
+    blk(110, 310, 330, 110, "#4d6250", L[3], 22);
+    blk(940, 310, 250, 110, "#6b4a4a", L[4], 0);
+    blk(110, 460, 1080, 110, "#4a5560", L[5], 34);
+    for (let i = 0; i < 16; i++) { const x = 110 + i * 67.5; g.fillStyle = "#7a6a52"; g.fillRect(x + 4, 600, 59, 90); g.strokeStyle = "rgba(255,255,255,.25)"; for (let k = 0; k < 6; k++) { g.beginPath(); g.moveTo(x + 8 + k * 9, 604); g.lineTo(x + 8 + k * 9, 686); g.stroke(); } }
+    g.fillStyle = "rgba(255,255,255,.75)"; g.font = "600 26px Arial"; g.textAlign = "center"; g.fillText(D.out, 650, 735);
+  } else {
+    for (let i = 0; i < 24; i++) { const x = 120 + i * 44; g.fillStyle = "#6b5a6e"; g.fillRect(x, 80, 38, 110); }
+    g.fillStyle = "rgba(255,255,255,.75)"; g.font = "600 28px Arial"; g.textAlign = "center"; g.fillText(D.scan, 650, 230);
+    blk(120, 270, 330, 200, "#5a4a6e", L[0], 18);
+    blk(490, 270, 690, 420, "#41557a", L[1], 12);
+    blk(120, 510, 330, 180, "#6a5a3e", L[2], 0);
+    blk(120, 730, 1060, 150, "#4d6250", L[3], 26);
+    blk(120, 910, 1060, 110, "#4a5560", L[4], 34);
+    for (let i = 0; i < 24; i++) { const x = 120 + i * 44; g.fillStyle = "#7a6a52"; g.fillRect(x, 1060, 38, 120); }
+    g.fillStyle = "rgba(255,255,255,.75)"; g.fillText(D.out, 650, 1225);
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const dieMat = new THREE.MeshPhysicalMaterial({ map: dieTexture(CFG.die), roughness: 0.25, metalness: 0.3, clearcoat: 1, clearcoatRoughness: 0.08, iridescence: 0.4, iridescenceThicknessRange: [200, 500] });
+const padMat = new THREE.MeshStandardMaterial({ color: 0xd9dbe0, metalness: 1, roughness: 0.3 });
+
+// ---------- 通用：封装主体、打标、内部 ----------
+const chip = new THREE.Group();
+const inside = new THREE.Group();
+chip.add(inside);
+scene.add(chip);
+let markMat, dimple, bodyMat = M.epoxy;
+function topMarking(w, d, yTop, x = 0) {
+  markMat = new THREE.MeshStandardMaterial({ map: markingTexture(CFG.mark, w, d), transparent: true, roughness: 0.9, depthWrite: false });
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), markMat);
+  m.rotation.x = -Math.PI / 2;
+  m.position.set(x, yTop + 0.002, 0);
+  chip.add(m);
+}
+function addDimple(x, z, y, r = 0.26) {
+  dimple = new THREE.Mesh(new THREE.CircleGeometry(r, 32), M.dimple);
+  dimple.rotation.x = -Math.PI / 2;
+  dimple.position.set(x, y + 0.003, z);
+  chip.add(dimple);
+}
+// 键合线：从硅片焊盘 a 拱起，落到引脚内端 b
+function bondWire(a, b, lift = 0.32) {
+  const mid1 = a.clone().lerp(b, 0.15); mid1.y = Math.max(a.y, b.y) + lift;
+  const mid2 = a.clone().lerp(b, 0.85); mid2.y = Math.max(a.y, b.y) + lift * 0.8;
+  const curve = new THREE.CatmullRomCurve3([a, mid1, mid2, b]);
+  add(new THREE.Mesh(new THREE.TubeGeometry(curve, 28, 0.014, 6), M.gold), "t_wire", { parent: inside, cast: false });
+  return curve;
+}
+
+// =====================================================================
+// SSOP24 / QSOP24：鸥翼形引脚
+// =====================================================================
+const PINS = {}; // name → {n, name, x, z, s, side, foot: [...points from board into the die], ...}
+let routesCur = [], routesDat = [], ledMats = [], views;
+
+function buildSOP() {
+  const PITCH = CFG.pitch || 0.635;
+  const pinX = (k) => (k - 5.5) * PITCH;
+  const list = [];
+  for (let k = 0; k < 12; k++) list.push({ n: k + 1, x: pinX(k), s: 1 });
+  for (let k = 0; k < 12; k++) list.push({ n: 13 + k, x: pinX(11 - k), s: -1 });
+  list.forEach((p) => { p.name = CFG.pins[p.n - 1]; PINS[p.name] = p; });
+
+  add(new THREE.Mesh(new RoundedBoxGeometry(21, 0.8, 22, 4, 0.3), M.mask), null, { cast: false }).position.set(1, -0.4, 0);
+  [[[-4.8, 2.2], [4.8, 2.2]], [[-4.8, -2.2], [4.8, -2.2]]].forEach(([a, b]) => segBox(a, b, 0.07, M.silk, 0.006, 0.012));
+  add(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.16, 0.012, 20), M.silk), null, { cast: false }).position.set(-4.6, 0.006, 3.3);
+
+  const LEAD = [[1.7, 0.85], [2.15, 0.85], [2.36, 0.74], [2.47, 0.5], [2.55, 0.24], [2.68, 0.135], [3.0, 0.135]];
+  const half = 0.1, top = [], bot = [];
+  for (let i = 0; i < LEAD.length; i++) {
+    const a = LEAD[Math.max(0, i - 1)], b = LEAD[Math.min(LEAD.length - 1, i + 1)];
+    const dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy);
+    top.push(new THREE.Vector2(LEAD[i][0] - (dy / l) * half, LEAD[i][1] + (dx / l) * half));
+    bot.push(new THREE.Vector2(LEAD[i][0] + (dy / l) * half, LEAD[i][1] - (dx / l) * half));
+  }
+  const leadGeo = new THREE.ExtrudeGeometry(new THREE.Shape([...top, ...bot.reverse()]), { depth: 0.25, bevelEnabled: false });
+  leadGeo.rotateY(-Math.PI / 2); leadGeo.translate(0.125, 0, 0); leadGeo.computeVertexNormals();
+  const padGeo = new THREE.BoxGeometry(0.4, 0.035, 0.8);
+  const filletGeo = new RoundedBoxGeometry(0.34, 0.09, 0.42, 2, 0.04);
+  list.forEach((p) => {
+    const lead = new THREE.Mesh(leadGeo, M.tin);
+    lead.position.x = p.x; lead.scale.z = p.s; lead.userData.pin = p;
+    add(lead, "pin", { parent: chip });
+    add(new THREE.Mesh(padGeo, M.tin), null, { cast: false }).position.set(p.x, 0.0175, p.s * 2.82);
+    add(new THREE.Mesh(filletGeo, M.solder), null, { cast: false }).position.set(p.x, 0.07, p.s * 2.98);
+  });
+  const L = CFG.body || [8.65, 1.4, 3.9];
+  add(new THREE.Mesh(new RoundedBoxGeometry(L[0], L[1], L[2], 3, 0.12), M.epoxy), "t_body", { parent: chip }).position.y = 0.15 + L[1] / 2;
+  topMarking(L[0] - 1.05, L[2] - 0.48, 0.15 + L[1], 0.3);
+  addDimple(-L[0] / 2 + 0.58, 1.2, 0.15 + L[1]);
+
+  // 内部
+  const DIE_TOP = 0.85;
+  add(new THREE.Mesh(new THREE.BoxGeometry(3.1, 0.12, 2.0), M.frame), "t_frame", { parent: inside }).position.y = 0.6;
+  const die = add(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.18, 1.6), [M.frame, M.frame, dieMat, M.frame, M.frame, M.frame]), "t_die", { parent: inside });
+  die.position.y = DIE_TOP - 0.09;
+  list.forEach((p) => {
+    const s = p.s, tx = p.x * 0.48, tz = s * 1.18;
+    const dpx = THREE.MathUtils.clamp(p.x * 0.33, -1.15, 1.15), dpz = s * 0.68;
+    const shape = new THREE.Shape([new THREE.Vector2(p.x - 0.11, s * 1.95), new THREE.Vector2(p.x + 0.11, s * 1.95), new THREE.Vector2(tx + 0.08, tz), new THREE.Vector2(tx - 0.08, tz)]);
+    const ig = new THREE.ExtrudeGeometry(shape, { depth: 0.15, bevelEnabled: false });
+    ig.rotateX(Math.PI / 2); ig.translate(0, 0.925, 0);
+    add(new THREE.Mesh(ig, M.frame), "t_frame", { parent: inside });
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.02, 0.13), padMat), null, { parent: inside }).position.set(dpx, DIE_TOP + 0.01, dpz);
+    const wire = bondWire(V(dpx, DIE_TOP + 0.02, dpz), V(tx, 0.93, tz));
+    // 从板上焊盘一路走进硅片的点
+    p.inward = [...LEAD.slice().reverse().map(([z, y]) => V(p.x, y, s * z)), V(p.x, 0.85, s * 1.95), V(tx, 0.93, tz), ...wire.getPoints(16).reverse()];
+    p.diePad = V(dpx, DIE_TOP + 0.03, s * 0.3);
+  });
+
+  // 外围：16 颗 LED、行线、REXT 电阻、电容
+  const LED_Z = 7.6, RAIL_Z = 8.95;
+  const sink = IC.drive === "sink";
+  const outs = Array.from({ length: 16 }, (_, i) => PINS[`OUT${i}`]);
+  const ledX = (i) => (i < 8 ? (i - 3.5) * 1.25 + 1.3 : (3.5 - (i - 8)) * 1.25 + 1.3);
+  const col = CFG.led || { base: 0x2a0a08, glow: 0xff1a0a };
+  const ledGeo = new RoundedBoxGeometry(1.5, 0.55, 1.5, 2, 0.08);
+  const lensGeo = new THREE.CylinderGeometry(0.55, 0.6, 0.06, 40);
+  outs.forEach((p, i) => {
+    const s = p.s, lx = ledX(i);
+    traceLine([[p.x, s * 3.0], [p.x, s * 3.6], [lx, s * 5.6], [lx, s * 6.95]]);
+    traceLine([[lx, s * 8.3], [lx, s * RAIL_Z]]);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.035, 0.5), M.tin), null, { cast: false }).position.set(lx, 0.0175, s * 6.95);
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.035, 0.5), M.tin), null, { cast: false }).position.set(lx, 0.0175, s * 8.25);
+    add(new THREE.Mesh(ledGeo, M.ledBody), "t_led1").position.set(lx, 0.3, s * LED_Z);
+    const lm = new THREE.MeshStandardMaterial({ color: col.base, emissive: col.glow, emissiveIntensity: 0, roughness: 0.15 });
+    ledMats.push(lm);
+    add(new THREE.Mesh(lensGeo, lm), "t_led1").position.set(lx, 0.6, s * LED_Z);
+  });
+  [1, -1].forEach((s) => {
+    const rail = segBox([-5.6, s * RAIL_Z], [7.4, s * RAIL_Z], 0.5, M.trace);
+    rail.userData.tip = sink ? "t_rail_sink" : "t_rail_source";
+    pickables.push(rail);
+    via(-5.9, s * RAIL_Z);
+  });
+  for (const name of CFG.vias) { const p = PINS[name]; traceLine([[p.x, p.s * 3.0], [p.x, p.s * 3.75]]); via(p.x, p.s * 3.75); }
+  const rext = PINS[CFG.rext], vdd = PINS.VDD;
+  traceLine([[rext.x, -3.0], [rext.x, -4.3]]);
+  traceLine([[vdd.x, -3.0], [vdd.x, -3.5], [-5.2, -3.5], [-5.2, -4.3]]);
+  chipPart(rext.x, -5.0, 0.8, 1.6, 0.45, M.resBody, "t_rext");
+  chipPart(-5.2, -5.0, 0.8, 1.6, 0.8, M.capBody, "t_cap");
+  via(rext.x, -5.9); via(-5.2, -5.9);
+
+  // 电流路径。按“灌电流”的方向搭好：行线 → LED → OUT → 硅片 → 电源引脚；拉电流（共阴）时整条反过来，电源引脚换成 VDD。
+  const supply = PINS[sink ? "GND" : "VDD"];
+  const supplyExt = sink ? [V(supply.x, Y, 3.0), V(supply.x, Y, 3.75)] : [V(vdd.x, Y, -3.0), V(vdd.x, Y, -3.5), V(-5.2, Y, -3.5), V(-5.2, Y, -4.3)];
+  routesCur = outs.map((p, i) => {
+    const s = p.s, lx = ledX(i);
+    const pts = [V(-5.6, Y, s * RAIL_Z), V(lx, Y, s * RAIL_Z), V(lx, Y, s * 8.25), V(lx, 0.66, s * LED_Z), V(lx, Y, s * 6.95), V(lx, Y, s * 5.6), V(p.x, Y, s * 3.6), V(p.x, Y, s * 3.0),
+      ...p.inward, p.diePad, V(supply.diePad.x, 0.88, supply.diePad.z), ...supply.inward.slice().reverse(), ...supplyExt];
+    return new Poly(sink ? pts : pts.reverse());
+  });
+  routesDat = CFG.data.map((name) => { const p = PINS[name]; return new Poly([V(p.x, Y, 3.75), V(p.x, Y, 3.0), ...p.inward, V(-0.75, 0.88, 0.1)]); });
+  views = { all: { pos: V(12, 14, 18), target: V(1, 0, 0) }, close: { pos: V(2.2, 8.2, 6.4), target: V(0, 0.8, 0.2) } };
+}
+
+// =====================================================================
+// 行列一体芯片（QFN88 / BGA208）+ RGB 像素矩阵
+// =====================================================================
+const ROWS = 4, COLS = 6, PIX = 1.7, MZ0 = 9.2;
+const pixelX = (c) => (c - (COLS - 1) / 2) * PIX;
+const rowZ = (r) => MZ0 + r * PIX;
+// 示例画面：每个像素的 R / G / B 亮度
+const IMAGE = Array.from({ length: ROWS }, (_, r) => Array.from({ length: COLS }, (_, c) => {
+  const h = (c / COLS + r * 0.13) % 1;
+  const f = (k) => Math.max(0, Math.min(1, Math.abs(((h * 6 + k) % 6) - 3) - 1));
+  return [f(0), f(4), f(2)];
+}));
+let pixMats = [];
+
+function buildIntegrated() {
+  add(new THREE.Mesh(new RoundedBoxGeometry(27, 0.8, 32, 4, 0.3), M.mask), null, { cast: false }).position.set(0, -0.4, 3.5);
+  const half = CFG.size / 2;
+  const QFN = CFG.pkg === "qfn88";
+  // ---- 封装 ----
+  let bodyTop, dieSize, fingerR, padY;
+  if (QFN) {
+    const H = 0.85;
+    add(new THREE.Mesh(new RoundedBoxGeometry(CFG.size, H, CFG.size, 2, 0.05), M.epoxy), "t_body", { parent: chip }).position.y = 0.03 + H / 2;
+    bodyTop = 0.03 + H;
+    add(new THREE.Mesh(new THREE.BoxGeometry(6.2, 0.03, 6.2), M.tin), "t_epad", { cast: false }).position.set(0, 0.015, 0); // 底部散热焊盘（板上）
+    const pitch = 0.4, side = (i) => (i - 10.5) * pitch;
+    const geoX = new THREE.BoxGeometry(0.45, 0.2, 0.22), geoZ = new THREE.BoxGeometry(0.22, 0.2, 0.45);
+    CFG.pins.forEach((name, idx) => {
+      const n = idx + 1, i = (n - 1) % 22, sideNo = Math.floor((n - 1) / 22);
+      let x, z, nx = 0, nz = 0;
+      if (sideNo === 0) { x = -half; z = side(i); nx = -1; }
+      else if (sideNo === 1) { x = side(i); z = half; nz = 1; }
+      else if (sideNo === 2) { x = half; z = -side(i); nx = 1; }
+      else { x = -side(i); z = -half; nz = -1; }
+      const p = { n, name, x, z, nx, nz };
+      PINS[name] = PINS[name] ? PINS[name] : p;
+      p.self = p;
+      const term = new THREE.Mesh(nx ? geoX : geoZ, M.tin);
+      term.position.set(x - nx * 0.2, 0.13, z - nz * 0.2);
+      term.userData.pin = p;
+      add(term, "pin", { parent: chip });
+      add(new THREE.Mesh(nx ? new THREE.BoxGeometry(0.8, 0.035, 0.24) : new THREE.BoxGeometry(0.24, 0.035, 0.8), M.tin), null, { cast: false }).position.set(x + nx * 0.2, 0.0175, z + nz * 0.2);
+      p.edge = V(x + nx * 0.45, Y, z + nz * 0.45);
+      p.finger = V(x - nx * 0.6, 0.3, z - nz * 0.6);
+      (PINS.__list ||= []).push(p);
+      add(new THREE.Mesh(nx ? new THREE.BoxGeometry(0.7, 0.1, 0.18) : new THREE.BoxGeometry(0.18, 0.1, 0.7), M.frame), "t_frame", { parent: inside }).position.copy(p.finger).add(V(nx * 0.25, 0, nz * 0.25));
+    });
+    // QFN 只有 0.85 mm 厚：硅片和键合线要压低，否则线会穿出封装顶面
+    dieSize = 4.6; fingerR = half - 0.6; padY = 0.24;
+    add(new THREE.Mesh(new THREE.BoxGeometry(6.0, 0.1, 6.0), M.frame), "t_frame", { parent: inside }).position.y = 0.2;
+    addDimple(-half + 0.75, -half + 0.75, bodyTop, 0.3);
+  } else {
+    // BGA：底部锡球 + 基板 + 塑封盖
+    const ballR = 0.2, standoff = 0.32;
+    const subH = 0.36, capH = 0.7;
+    add(new THREE.Mesh(new THREE.BoxGeometry(CFG.size, subH, CFG.size), M.substrate), "t_sub", { parent: chip }).position.y = standoff + subH / 2;
+    add(new THREE.Mesh(new RoundedBoxGeometry(CFG.size - 0.5, capH, CFG.size - 0.5, 2, 0.06), M.epoxy), "t_body", { parent: chip }).position.y = standoff + subH + capH / 2;
+    bodyTop = standoff + subH + capH;
+    const balls = [], n = 16, pitch = 0.5;
+    for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+      const inner = i >= 5 && i <= 10 && j >= 4 && j <= 11; // 中间留空：16 × 16 − 6 × 8 = 208
+      if (!inner) balls.push([(i - 7.5) * pitch, (j - 7.5) * pitch]);
+    }
+    const ballMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(ballR, 16, 12), M.solder, balls.length);
+    balls.forEach(([x, z], k) => ballMesh.setMatrixAt(k, new THREE.Matrix4().makeTranslation(x, ballR * 0.9, z)));
+    ballMesh.castShadow = true;
+    ballMesh.userData.tip = "t_ball";
+    pickables.push(ballMesh);
+    chip.add(ballMesh);
+    dieSize = 4.4; fingerR = 3.4; padY = standoff + subH;
+    addDimple(-half + 0.8, -half + 0.8, bodyTop, 0.28);
+  }
+  topMarking(CFG.size * 0.82, CFG.size * 0.5, bodyTop);
+  const dieH = QFN ? 0.14 : 0.2;
+  const die = add(new THREE.Mesh(new THREE.BoxGeometry(dieSize, dieH, dieSize), [M.frame, M.frame, dieMat, M.frame, M.frame, M.frame]), "t_die", { parent: inside });
+  const dieTop = padY + dieH + 0.02;
+  die.position.y = padY + dieH / 2 + 0.01;
+  const loop = QFN ? 0.14 : 0.35;
+
+  // ---- 键合线：每条用到的信号一根 ----
+  const dh = dieSize / 2 - 0.2;
+  const wireTo = (finger, nx, nz) => {
+    const pad = V(THREE.MathUtils.clamp(finger.x, -dh, dh) - nx * 0.0, dieTop + 0.01, THREE.MathUtils.clamp(finger.z, -dh, dh));
+    if (nx) pad.x = nx * dh; else pad.z = nz * dh;
+    add(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.02, 0.12), padMat), null, { parent: inside }).position.copy(pad);
+    return bondWire(pad, V(finger.x, QFN ? finger.y + 0.05 : padY + 0.06, finger.z), loop);
+  };
+  if (QFN) PINS.__list.forEach((p) => { const w = wireTo(V(p.finger.x * 0.94, p.finger.y, p.finger.z * 0.94), p.nx, p.nz); p.inward = [p.edge, V(p.x, 0.13, p.z), p.finger, ...w.getPoints(14).reverse()]; });
+
+  // ---- 像素矩阵 ----
+  const pixGeo = new RoundedBoxGeometry(1.15, 0.4, 1.15, 2, 0.06);
+  const dotGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.04, 20);
+  const GLOW = [[0xff1a0a, 0x2a0606], [0x18ff4a, 0x062a0e], [0x2a5bff, 0x060c2a]];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) {
+    add(new THREE.Mesh(pixGeo, M.pixBody), "t_pixel").position.set(pixelX(c), 0.22, rowZ(r));
+    for (let k = 0; k < 3; k++) {
+      const m = new THREE.MeshStandardMaterial({ color: GLOW[k][1], emissive: GLOW[k][0], emissiveIntensity: 0, roughness: 0.2 });
+      pixMats.push({ m, r, c, k });
+      add(new THREE.Mesh(dotGeo, m), "t_pixel", { cast: false }).position.set(pixelX(c) + (k - 1) * 0.32, 0.43, rowZ(r));
+    }
+  }
+  // 数据线（阳极，列）：芯片前侧 18 根 → 6 列 × RGB
+  const dataPins = CFG.dataPins.map((name) => PINS[name] || null);
+  const colLineX = (c, k) => pixelX(c) + (k - 1) * 0.32;
+  const colStart = (j) => (QFN ? dataPins[j].edge : V(-3.4 + j * 0.4, Y, half + 0.2));
+  for (let c = 0; c < COLS; c++) for (let k = 0; k < 3; k++) {
+    const j = c * 3 + k, e = colStart(j), x = colLineX(c, k);
+    traceLine([[e.x, e.z], [e.x, half + 1.2 + (j % 3) * 0.0], [x, half + 3.0], [x, rowZ(ROWS - 1) + 0.2]], 0.1, "t_col");
+  }
+  // 扫描线（阴极，行）：芯片后侧 → 绕到矩阵两边 → 横穿每一行
+  const scanPins = CFG.scanPins.map((name) => PINS[name] || null);
+  const rowLineZ = (r) => rowZ(r) + 0.72;
+  const scanStart = (r) => (QFN ? scanPins[r].edge : V((r % 2 ? 1 : -1) * (3.2 - Math.floor(r / 2) * 0.45), Y, -half - 0.2));
+  const scanPath = (r) => {
+    const e = scanStart(r), sgn = r % 2 ? 1 : -1, lane = Math.floor(r / 2);
+    const out = -half - 1.0 - lane * 0.5, sideX = sgn * (half + 2.2 + lane * 0.55);
+    return [[e.x, e.z], [e.x, out], [sideX, out], [sideX, rowLineZ(r)], [sgn * (pixelX(COLS - 1) + 0.9), rowLineZ(r)]];
+  };
+  for (let r = 0; r < ROWS; r++) {
+    traceLine(scanPath(r), 0.14, "t_row");
+    traceLine([[pixelX(0) - 0.9, rowLineZ(r)], [pixelX(COLS - 1) + 0.9, rowLineZ(r)]], 0.14, "t_row");
+  }
+  // SPI 接口 → 过孔
+  CFG.dataBus.forEach((name, i) => {
+    if (QFN) { const p = PINS[name]; traceLine([[p.edge.x, p.edge.z], [-half - 1.6, p.edge.z]]); via(-half - 1.6, p.edge.z); }
+  });
+  if (!QFN) [-1, 0, 1].forEach((i) => { traceLine([[-half - 0.2, i * 0.6], [-half - 1.6, i * 0.6]]); via(-half - 1.6, i * 0.6); });
+
+  // ---- 电流 / 数据路径 ----
+  const bgaFinger = (x, z) => V(THREE.MathUtils.clamp(x, -fingerR, fingerR), padY + 0.06, THREE.MathUtils.clamp(z, -fingerR, fingerR));
+  const bgaPaths = new Map(); // 同一个起点只建一根键合线，多条电流路径共用
+  const intoChip = (p, start, nx, nz) => {
+    if (QFN) return p.inward;
+    const key = `${start.x.toFixed(2)},${start.z.toFixed(2)}`;
+    if (!bgaPaths.has(key)) {
+      const f = bgaFinger(start.x * 0.8, start.z > 0 ? fingerR : -fingerR);
+      add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.02, 0.3), M.gold), "t_sub", { parent: inside, cast: false }).position.set(f.x, padY + 0.01, f.z);
+      const w = wireTo(f, 0, nz);
+      bgaPaths.set(key, [start, V(start.x, 0.2, start.z - nz * 0.6), V(f.x, padY, f.z), f, ...w.getPoints(14).reverse()]);
+    }
+    return bgaPaths.get(key);
+  };
+  const dieCenter = V(0, dieTop + 0.02, 0);
+  // 每个 (行, 列, 颜色) 一条路径：数据引脚 → 列线 → 像素 → 行线 → 扫描引脚 → 硅片
+  routesCur = [];
+  for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) for (let k = 0; k < 3; k++) {
+    const j = c * 3 + k, e = colStart(j), x = colLineX(c, k);
+    const din = intoChip(dataPins[j], e, 0, 1).slice().reverse();
+    const sp = scanPath(r).slice().reverse().map(([px, pz]) => V(px, Y, pz));
+    const s0 = scanStart(r);
+    const sin = intoChip(scanPins[r], s0, 0, -1);
+    const pts = [dieCenter, ...din, V(e.x, Y, half + 1.2), V(x, Y, half + 3.0), V(x, Y, rowZ(r)), V(x, 0.5, rowZ(r)), V(x, Y, rowLineZ(r)), ...sp, ...sin, dieCenter];
+    const route = new Poly(pts); route.r = r; route.c = c; route.k = k;
+    routesCur.push(route);
+  }
+  routesDat = CFG.dataBus.map((name, i) => {
+    if (QFN) { const p = PINS[name]; return new Poly([V(-half - 1.6, Y, p.edge.z), ...p.inward, dieCenter]); }
+    const z = (i - 1) * 0.6, s = V(-half - 0.2, Y, z);
+    return new Poly([V(-half - 1.6, Y, z), s, V(-half + 0.6, 0.2, z), V(-fingerR, padY, z), V(-dh, dieTop + 0.02, z * 0.8), dieCenter]);
+  });
+  views = { all: { pos: V(15, 19, 26), target: V(0, 0, 4) }, close: { pos: V(3.5, 13, 9.5), target: V(0, 0.6, 0.6) } };
+}
+
+if (INTEGRATED) buildIntegrated(); else buildSOP();
+
+// ---------- 光点 ----------
+const PER = INTEGRATED ? 4 : 9;
+const glowGeo = new THREE.SphereGeometry(INTEGRATED ? 0.07 : 0.055, 12, 8);
+const curDots = new THREE.InstancedMesh(glowGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(4.2, 1.35, 0.25) }), routesCur.length * PER);
+const datDots = new THREE.InstancedMesh(glowGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(0.7, 2.4, 9) }), routesDat.length * PER);
+curDots.frustumCulled = datDots.frustumCulled = false;
+scene.add(curDots, datDots);
+const DUTY = [0.95, 0.82, 0.68, 0.55, 0.42, 0.3, 0.18, 0.08, 0.08, 0.18, 0.3, 0.42, 0.55, 0.68, 0.82, 0.95];
+
+// ---------- 后期：辉光（阈值高于 1，只有自发光部分发光） ----------
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+composer.addPass(new UnrealBloomPass(new THREE.Vector2(800, 600), 0.5, 0.3, 1.6));
+composer.addPass(new OutputPass());
+
+// ---------- 相机与交互 ----------
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.minDistance = 3;
+controls.maxDistance = 60;
+controls.maxPolarAngle = 1.48;
+controls.autoRotate = !still;
+controls.autoRotateSpeed = 0.45;
+let fly = null;
+controls.addEventListener("start", () => { controls.autoRotate = false; fly = null; });
+camera.position.copy(views.all.pos);
+controls.target.copy(views.all.target);
+const flyTo = (v) => { controls.autoRotate = false; fly = { t: 0, p0: camera.position.clone(), t0: controls.target.clone(), v }; };
+
+const state = { xray: 0, xrayTarget: 0, current: true, slow: false };
+host.querySelector(".tools").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-act]");
+  if (!b) return;
+  const act = b.dataset.act;
+  if (act === "xray") { state.xrayTarget = state.xrayTarget ? 0 : 1; b.setAttribute("aria-pressed", String(!!state.xrayTarget)); if (state.xrayTarget) flyTo(views.close); }
+  if (act === "current") { state.current = !state.current; b.setAttribute("aria-pressed", String(state.current)); }
+  if (act === "slow") { state.slow = !state.slow; b.setAttribute("aria-pressed", String(state.slow)); }
+  if (act === "view-close") flyTo(views.close);
+  if (act === "view-all") flyTo(views.all);
+});
+
+// 悬停提示
+const pinTip = (p) => {
+  const n = p.name;
+  let k;
+  if (/^OUT\d+$/.test(n)) k = IC.drive === "sink" ? "pin_OUT_sink" : "pin_OUT_source";
+  else if (/^DATA/.test(n)) k = "pin_DATA";
+  else if (/^SCAN/.test(n)) k = "pin_SCAN";
+  else if (["VSSLED", "VDDLEDH", "VDDLEDL"].includes(n)) k = `pin_${n}`;
+  else if (["VDD", "VDDIO", "VSS", "VCCH", "VSCANH"].includes(n) && INTEGRATED) k = "pin_PWR";
+  else if (["SCL", "SDA", "CSX"].includes(n)) k = "pin_IF";
+  else if (UI.t(`pin_${n}`) !== `pin_${n}`) k = `pin_${n}`;
+  else k = "pin_CTRL";
+  return `<b>${UI.t("pin")} ${p.n} · ${n}</b><br>${UI.t(k)}`;
+};
+const ray = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+renderer.domElement.addEventListener("pointermove", (e) => {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(pickables, false).find((h) => state.xray > 0.5 || h.object.parent !== inside);
+  let msg = "";
+  if (hit) msg = hit.object.userData.tip === "pin" ? pinTip(hit.object.userData.pin) : UI.t(hit.object.userData.tip);
+  tipEl.innerHTML = msg;
+  tipEl.style.opacity = msg ? "1" : "0";
+  tipEl.style.left = `${e.clientX - r.left}px`;
+  tipEl.style.top = `${e.clientY - r.top}px`;
+  renderer.domElement.style.cursor = msg ? "help" : "";
+});
+renderer.domElement.addEventListener("pointerleave", () => (tipEl.style.opacity = "0"));
+
+// ---------- 尺寸、主题 ----------
+const resize = () => {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+};
+new ResizeObserver(resize).observe(stage);
+resize();
+UI.onChange(setBg);
+
+// ---------- 每帧 ----------
+const timer = new THREE.Timer();
+timer.connect(document);
+const tmp = new THREE.Vector3(), mtx = new THREE.Matrix4(), zero = new THREE.Matrix4().makeScale(0, 0, 0);
+const ease = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const glow = new Float32Array(Math.max(16, pixMats.length));
+const place = (mesh, idx, route, u, lift = 0) => { route.at(u, tmp); mesh.setMatrixAt(idx, mtx.makeTranslation(tmp.x, tmp.y + lift, tmp.z)); };
+function frame() {
+  timer.update();
+  const dt = Math.min(timer.getDelta(), 0.1), time = timer.getElapsed();
+  state.xray += (state.xrayTarget - state.xray) * (1 - Math.exp(-dt / 0.18));
+  M.epoxy.opacity = 1 - 0.85 * state.xray;
+  M.epoxy.depthWrite = state.xray < 0.5;
+  M.substrate.opacity = 1 - 0.6 * state.xray;
+  markMat.opacity = 1 - state.xray;
+  if (dimple) dimple.visible = state.xray < 0.5;
+  const k = 1 - Math.exp(-dt / 0.05);
+  if (!INTEGRATED) {
+    // PWM：慢放时每个通道按占空比开关；正常速度下太快看不出，用平均亮度
+    const phase = (time / 2.8) % 1;
+    for (let i = 0; i < 16; i++) {
+      const on = phase < DUTY[i];
+      glow[i] += ((state.slow ? (on ? 1 : 0) : DUTY[i]) - glow[i]) * k;
+      ledMats[i].emissiveIntensity = glow[i] * 2.6;
+    }
+    const speed = state.slow ? 0.05 : 0.11;
+    routesCur.forEach((r, i) => {
+      const on = phase < DUTY[i];
+      for (let n = 0; n < PER; n++) {
+        const vis = state.current && (state.slow ? on : n / PER < DUTY[i] + 0.05);
+        if (!vis) { curDots.setMatrixAt(i * PER + n, zero); continue; }
+        place(curDots, i * PER + n, r, time * speed * (14 / r.len) + n / PER);
+      }
+    });
+    routesDat.forEach((r, i) => {
+      const burst = state.slow ? phase > 0.9 || phase < 0.05 : true;
+      for (let n = 0; n < PER; n++) {
+        if (!state.current || !burst) { datDots.setMatrixAt(i * PER + n, zero); continue; }
+        place(datDots, i * PER + n, r, time * 0.35 + n / PER + i * 0.13, 0.02);
+      }
+    });
+  } else {
+    // 行扫描：慢放时一行一行亮；正常速度下四行同时“看起来”亮着
+    const rowPeriod = state.slow ? 1.3 : 0.25;
+    const active = Math.floor(time / rowPeriod) % ROWS;
+    pixMats.forEach((p, i) => {
+      const v = IMAGE[p.r][p.c][p.k];
+      glow[i] += ((state.slow ? (p.r === active ? v : 0) : v) - glow[i]) * k;
+      p.m.emissiveIntensity = glow[i] * 2.4;
+    });
+    routesCur.forEach((r, i) => {
+      const v = IMAGE[r.r][r.c][r.k];
+      const rowOn = state.slow ? r.r === active : true;
+      for (let n = 0; n < PER; n++) {
+        const vis = state.current && rowOn && v > 0.15 && n / PER < v + 0.1;
+        if (!vis) { curDots.setMatrixAt(i * PER + n, zero); continue; }
+        place(curDots, i * PER + n, r, time * (state.slow ? 0.05 : 0.08) * (20 / r.len) + n / PER + r.r * 0.07);
+      }
+    });
+    routesDat.forEach((r, i) => {
+      for (let n = 0; n < PER; n++) {
+        if (!state.current) { datDots.setMatrixAt(i * PER + n, zero); continue; }
+        place(datDots, i * PER + n, r, time * 0.3 + n / PER + i * 0.17, 0.02);
+      }
+    });
+  }
+  curDots.instanceMatrix.needsUpdate = true;
+  datDots.instanceMatrix.needsUpdate = true;
+  if (fly) {
+    fly.t = Math.min(1, fly.t + dt / 1.2);
+    const e = ease(fly.t);
+    camera.position.lerpVectors(fly.p0, fly.v.pos, e);
+    controls.target.lerpVectors(fly.t0, fly.v.target, e);
+    if (fly.t >= 1) fly = null;
+  }
+  controls.update(dt);
+  composer.render();
+}
+let running = false;
+new IntersectionObserver(([e]) => {
+  const want = e.isIntersecting;
+  if (want !== running) { running = want; renderer.setAnimationLoop(want ? frame : null); }
+}, { rootMargin: "120px" }).observe(stage);
+host.querySelector(".status")?.remove();
+host.querySelector(".tools").hidden = false;
+host.querySelector(".legend").hidden = false;
+
+</script>
+<script>
+// three.js 没能加载（例如离线）时，给出说明而不是一直显示“加载中”
+setTimeout(() => { const s = document.querySelector("#viewer .status"); if (s) s.textContent = window.ICPAGE.t("fail"); }, 12000);
+</script>
+</body>
+</html>
